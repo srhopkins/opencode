@@ -6,6 +6,7 @@ import {
   migrateCanonicalLocalServerState,
   nextServerAfterRemoval,
   resolveServerList,
+  seedLocalServer,
   ServerConnection,
 } from "./server"
 import { ServerScope } from "@/utils/server-scope"
@@ -93,6 +94,51 @@ test("active server removal falls back across built-in and persisted servers", (
       ServerConnection.Key.make("sidecar"),
     ),
   ).toBe(ServerConnection.Key.make("sidecar"))
+})
+
+describe("seedLocalServer", () => {
+  test("appends the local backend, shaped like Add Server, when the list is empty", () => {
+    const next = seedLocalServer([], "http://127.0.0.1:4096")
+    expect(next).toEqual([{ type: "http", http: { url: "http://127.0.0.1:4096" } }])
+  })
+
+  test("is a no-op (same array reference) once a local server is already present", () => {
+    const list: Parameters<typeof seedLocalServer>[0] = ["http://127.0.0.1:4096"]
+    expect(seedLocalServer(list, "http://127.0.0.1:4096")).toBe(list)
+  })
+
+  test("recognizes an existing local server under a different loopback host as already seeded", () => {
+    const list: Parameters<typeof seedLocalServer>[0] = [{ type: "http", http: { url: "http://localhost:4096" } }]
+    expect(seedLocalServer(list, "http://127.0.0.1:4096")).toBe(list)
+  })
+
+  test("never touches or removes user-added remote servers", () => {
+    const list: Parameters<typeof seedLocalServer>[0] = [
+      { type: "http", http: { url: "https://remote.example.test" }, displayName: "Prod" },
+    ]
+    const next = seedLocalServer(list, "http://127.0.0.1:4096")
+    expect(next).toEqual([
+      { type: "http", http: { url: "https://remote.example.test" }, displayName: "Prod" },
+      { type: "http", http: { url: "http://127.0.0.1:4096" } },
+    ])
+  })
+
+  test("still seeds when other (non-local) servers exist but no local server does", () => {
+    const list: Parameters<typeof seedLocalServer>[0] = ["https://remote.example.test"]
+    const next = seedLocalServer(list, "http://127.0.0.1:4096")
+    expect(next).toHaveLength(2)
+    expect(next[1]).toEqual({ type: "http", http: { url: "http://127.0.0.1:4096" } })
+  })
+
+  test("normalizes a bare host:port into a full URL before seeding", () => {
+    const next = seedLocalServer([], "127.0.0.1:4096")
+    expect(next).toEqual([{ type: "http", http: { url: "http://127.0.0.1:4096" } }])
+  })
+
+  test("returns the same list unchanged for a blank/unparseable url", () => {
+    const list: Parameters<typeof seedLocalServer>[0] = []
+    expect(seedLocalServer(list, "   ")).toBe(list)
+  })
 })
 
 describe("createServerProjects", () => {

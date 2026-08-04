@@ -1,5 +1,5 @@
 import { createSimpleContext } from "@opencode-ai/ui/context"
-import { type Accessor, batch, createMemo } from "solid-js"
+import { type Accessor, batch, createEffect, createMemo } from "solid-js"
 import { createStore, type SetStoreFunction, type Store } from "solid-js/store"
 import { Persist, persisted } from "@/utils/persist"
 import { pathKey } from "@/utils/path-key"
@@ -171,6 +171,26 @@ export function createServerProjects<T extends ServerProjectState>(input: {
   }
 }
 
+function toStoredConnection(value: StoredServer): ServerConnection.Http {
+  if (typeof value === "string") return { type: "http", http: { url: value } }
+  if ("http" in value) return value
+  return { type: "http", http: value }
+}
+
+// murfy MVP UX (murfy-bxt): fresh browser profiles previously required manually pasting the
+// local backend URL into "Add Server". If the persisted server list has no local (loopback)
+// entry, append one shaped exactly like the "Add Server" dialog would create (no auth, no
+// display name) so it appears as a normal, editable/removable entry. Idempotent: a no-op
+// (same array reference back) once any local server is present, and never touches or removes
+// user-added remote servers.
+export function seedLocalServer(list: StoredServer[], url: string): StoredServer[] {
+  const normalized = normalizeServerUrl(url)
+  if (!normalized) return list
+  const hasLocal = list.some((entry) => ServerConnection.local(toStoredConnection(entry)))
+  if (hasLocal) return list
+  return [...list, { type: "http", http: { url: normalized } }]
+}
+
 export function resolveServerList(input: {
   props?: Array<ServerConnection.Any>
   stored: StoredServer[]
@@ -285,6 +305,9 @@ export const { use: useServer, provider: ServerProvider } = createSimpleContext(
     defaultServer: ServerConnection.Key
     canonicalLocalServer?: ServerConnection.Key
     servers?: Array<ServerConnection.Any>
+    // murfy MVP UX (murfy-bxt): URL to auto-seed into the persisted server list on first load
+    // when no local server is configured yet. See seedLocalServer() above.
+    autoSeedLocalServer?: string
   }) => {
     const [store, setStore, _, ready] = persisted(
       {
@@ -298,6 +321,15 @@ export const { use: useServer, provider: ServerProvider } = createSimpleContext(
         recentlyClosed: {} as Record<string, string[]>,
       }),
     )
+
+    if (props.autoSeedLocalServer) {
+      const seedUrl = props.autoSeedLocalServer
+      createEffect(() => {
+        if (!ready()) return
+        const next = seedLocalServer(store.list, seedUrl)
+        if (next !== store.list) setStore("list", next)
+      })
+    }
 
     const url = (x: StoredServer) => (typeof x === "string" ? x : "type" in x ? x.http.url : x.url)
 

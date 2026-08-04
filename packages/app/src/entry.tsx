@@ -95,11 +95,21 @@ if (!(root instanceof HTMLElement) && import.meta.env.DEV) {
   throw new Error(getRootNotFoundError())
 }
 
+// murfy MVP UX (murfy-bxt): murfy serves the static web build (packages/app/dist, :4200) and
+// the opencode backend (:4096) as separate origins/ports, unlike upstream's single-origin
+// self-hosted deployments where the web app and API share `location.origin`. Without this,
+// a fresh browser profile would default to :4200 as the "server" (a static file host with no
+// opencode API) and require manually pasting the real backend URL via Add Server. Override
+// with VITE_MURFY_SERVER_URL at build time (e.g. for a non-default backend port/host); falls
+// back to the documented default backend address.
+const MURFY_DEFAULT_SERVER_URL = "http://127.0.0.1:4096"
+const getMurfyServerUrl = () => import.meta.env.VITE_MURFY_SERVER_URL ?? MURFY_DEFAULT_SERVER_URL
+
 const getCurrentUrl = () => {
   if (location.hostname.includes("opencode.ai")) return "http://localhost:4096"
   if (import.meta.env.DEV)
     return `http://${import.meta.env.VITE_OPENCODE_SERVER_HOST ?? "localhost"}:${import.meta.env.VITE_OPENCODE_SERVER_PORT ?? "4096"}`
-  return location.origin
+  return getMurfyServerUrl()
 }
 
 const getDefaultUrl = () => {
@@ -167,6 +177,7 @@ if (root instanceof HTMLElement) {
             defaultServer={ServerConnection.Key.make(getDefaultUrl())}
             canonicalLocalServer={ServerConnection.key(server)}
             servers={[server]}
+            autoSeedLocalServer={getCurrentUrl()}
             disableHealthCheck
           />
         </AppBaseProviders>
