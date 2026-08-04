@@ -4,8 +4,13 @@
 // verified path against :8766 — always use it.
 import { concatFloat32, encodeWavMono } from "./wav-encoder"
 
+export interface MicCaptureStartOptions {
+  /** Called once per worklet PCM chunk with that chunk's RMS (0..1). */
+  onLevel?: (rms: number) => void
+}
+
 export interface MicCapture {
-  start(): Promise<void>
+  start(opts?: MicCaptureStartOptions): Promise<void>
   /** Stops recording and resolves with the captured audio. Safe to await from a UI event handler. */
   stop(): Promise<Blob>
   isRecording(): boolean
@@ -48,6 +53,30 @@ class MurfyPcmCaptureProcessor extends AudioWorkletProcessor {
 registerProcessor(${JSON.stringify(WORKLET_NAME)}, MurfyPcmCaptureProcessor)
 `
 
+/** RMS of float PCM samples, clamped to 0..1. Pure helper for metering + tests. */
+export function rmsLevel(samples: Float32Array): number {
+  if (samples.length === 0) return 0
+  let sumSquares = 0
+  for (let i = 0; i < samples.length; i++) {
+    const s = samples[i]!
+    sumSquares += s * s
+  }
+  const rms = Math.sqrt(sumSquares / samples.length)
+  if (rms <= 0) return 0
+  if (rms >= 1) return 1
+  return rms
+}
+
+/** Store one worklet PCM chunk and optionally report its RMS level. */
+export function handleWorkletPcmMessage(
+  data: Float32Array,
+  chunks: Float32Array[],
+  onLevel?: (rms: number) => void,
+): void {
+  chunks.push(data)
+  onLevel?.(rmsLevel(data))
+}
+
 class WorkletCapture implements MicCapture {
   private stream: MediaStream | null = null
   private context: AudioContext | null = null
@@ -56,12 +85,13 @@ class WorkletCapture implements MicCapture {
   private silence: GainNode | null = null
   private chunks: Float32Array[] = []
   private recording = false
+  private onLevel: ((rms: number) => void) | undefined
 
   isRecording() {
     return this.recording
   }
 
-  async start() {
+  async start(opts?: MicCaptureStartOptions) {
     if (this.recording) return
     this.stream = await navigator.mediaDevices.getUserMedia({ audio: true })
     this.context = new AudioContext()
@@ -73,10 +103,11 @@ class WorkletCapture implements MicCapture {
     }
 
     this.chunks = []
+    this.onLevel = opts?.onLevel
     this.source = this.context.createMediaStreamSource(this.stream)
     this.node = new AudioWorkletNode(this.context, WORKLET_NAME)
     this.node.port.onmessage = (event: MessageEvent<Float32Array>) => {
-      this.chunks.push(event.data)
+      handleWorkletPcmMessage(event.data, this.chunks, this.onLevel)
     }
     // Route through a silent gain so the graph is "active" (required for the
     // worklet to be pulled) without echoing the mic to the speakers.
@@ -99,6 +130,7 @@ class WorkletCapture implements MicCapture {
     this.silence = null
     this.stream = null
     this.context = null
+    this.onLevel = undefined
     this.recording = false
   }
 
