@@ -107,6 +107,7 @@ const icons = {
   mic: `<path d="M12.5 5C12.5 3.61929 11.3807 2.5 10 2.5C8.61929 2.5 7.5 3.61929 7.5 5V10C7.5 11.3807 8.61929 12.5 10 12.5C11.3807 12.5 12.5 11.3807 12.5 10V5Z" stroke="currentColor" stroke-linecap="square"/><path d="M5 9.58333V10C5 12.7614 7.23858 15 10 15C12.7614 15 15 12.7614 15 10V9.58333M10 15V17.5M7.5 17.5H12.5" stroke="currentColor" stroke-linecap="square"/>`,
   speaker: `<path d="M2.5 7.5H5.41667L9.16667 4.16667V15.8333L5.41667 12.5H2.5V7.5Z" stroke="currentColor" stroke-linejoin="round"/><path d="M12.5 7.5C13.6046 8.5 13.6046 11.5 12.5 12.5M15 5C17.5 7.5 17.5 12.5 15 15" stroke="currentColor" stroke-linecap="round"/>`,
   "speaker-off": `<path d="M2.5 7.5H5.41667L9.16667 4.16667V15.8333L5.41667 12.5H2.5V7.5Z" stroke="currentColor" stroke-linejoin="round"/><path d="M12.5 7.5L17.5 12.5M17.5 7.5L12.5 12.5" stroke="currentColor" stroke-linecap="round"/>`,
+  headset: `<path d="M4.16667 10.8333V9.16667C4.16667 5.94501 6.77834 3.33333 10 3.33333C13.2217 3.33333 15.8333 5.94501 15.8333 9.16667V10.8333" stroke="currentColor" stroke-linecap="round"/><rect x="2.5" y="10" width="3.33333" height="5.83333" rx="1.25" stroke="currentColor"/><rect x="14.1667" y="10" width="3.33333" height="5.83333" rx="1.25" stroke="currentColor"/><path d="M15.8333 15.8333V16.25C15.8333 17.1705 15.0871 17.9167 14.1667 17.9167H12.5" stroke="currentColor" stroke-linecap="round"/>`,
 }
 
 const spriteID = "opencode-icon-sprite"

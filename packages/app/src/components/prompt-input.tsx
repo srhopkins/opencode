@@ -1789,6 +1789,10 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               sessionID={() => props.controls.session.id}
               sync={sync}
               onTranscribed={(text) => addPart({ type: "text", content: text, start: 0, end: text.length })}
+              onAutoSend={(text) => {
+                addPart({ type: "text", content: text, start: 0, end: text.length })
+                void handleSubmit(new Event("submit"))
+              }}
             />
           </div>
         </DockTray>

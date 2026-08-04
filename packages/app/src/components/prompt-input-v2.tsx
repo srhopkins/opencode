@@ -46,6 +46,9 @@ export type PromptInputV2ComposerController = PromptInputV2Interaction & {
   readonly sessionID: string | undefined
   readonly sync: ReturnType<typeof useSync>
   readonly insertText: (text: string) => void
+  /** Inserts text into the draft and immediately submits, reusing the same submit
+   * path as the composer's send button (controller.submit()). Used by PTT auto-send. */
+  readonly sendText: (text: string) => void
 }
 
 export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
@@ -82,6 +85,7 @@ export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
         sessionID={() => props.controller.sessionID}
         sync={props.controller.sync}
         onTranscribed={props.controller.insertText}
+        onAutoSend={props.controller.sendText}
       />
     </div>
   )
@@ -435,6 +439,14 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
             ]
           : [...current, { type: "text" as const, content: trimmed, start: 0, end: trimmed.length }]
       prompt.set(next, promptLength(next))
+    },
+  })
+  Object.defineProperty(controller, "sendText", {
+    value: (text: string) => {
+      const trimmed = text.trim()
+      if (!trimmed) return
+      ;(controller as PromptInputV2ComposerController).insertText(trimmed)
+      controller.submit()
     },
   })
 
