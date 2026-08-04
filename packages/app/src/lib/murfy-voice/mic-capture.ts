@@ -1,11 +1,7 @@
-// Mic capture for dictation, with two paths:
-//   - Safari: MediaRecorder produces mp4/AAC directly, which the STT server
-//     accepts as-is.
-//   - Everyone else (Chrome, Firefox, ...): MediaRecorder only offers
-//     WebM/Opus, which the STT server cannot decode. Instead we tap raw PCM
-//     via an AudioWorklet and encode a WAV file client-side.
-// Both paths expose the same `MicCapture` interface so callers (dictation
-// button now; PTT mode / voice-loop later) don't need to branch on browser.
+// Mic capture for dictation / PTT: AudioWorklet → PCM → WAV client-side.
+// Chrome on macOS advertises MediaRecorder `audio/mp4`, but macos-speech-server
+// (FluidAudio) cannot decode those m4a uploads (500 / OSStatus -1). WAV is the
+// verified path against :8766 — always use it.
 import { concatFloat32, encodeWavMono } from "./wav-encoder"
 
 export interface MicCapture {
@@ -51,59 +47,6 @@ class MurfyPcmCaptureProcessor extends AudioWorkletProcessor {
 }
 registerProcessor(${JSON.stringify(WORKLET_NAME)}, MurfyPcmCaptureProcessor)
 `
-
-function supportsDirectMimeType(): string | undefined {
-  if (typeof MediaRecorder === "undefined") return undefined
-  for (const mimeType of ["audio/mp4", "audio/mp4;codecs=mp4a.40.2"]) {
-    if (MediaRecorder.isTypeSupported(mimeType)) return mimeType
-  }
-  return undefined
-}
-
-class MediaRecorderCapture implements MicCapture {
-  private recorder: MediaRecorder | null = null
-  private stream: MediaStream | null = null
-  private chunks: Blob[] = []
-
-  constructor(private mimeType: string) {}
-
-  isRecording() {
-    return this.recorder?.state === "recording"
-  }
-
-  async start() {
-    if (this.isRecording()) return
-    this.stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-    this.chunks = []
-    this.recorder = new MediaRecorder(this.stream, { mimeType: this.mimeType })
-    this.recorder.ondataavailable = (event) => {
-      if (event.data.size > 0) this.chunks.push(event.data)
-    }
-    this.recorder.start()
-  }
-
-  stop(): Promise<Blob> {
-    const recorder = this.recorder
-    if (!recorder || recorder.state !== "recording") return Promise.resolve(new Blob())
-    return new Promise((resolve) => {
-      recorder.onstop = () => {
-        this.stream?.getTracks().forEach((track) => track.stop())
-        this.stream = null
-        this.recorder = null
-        resolve(new Blob(this.chunks, { type: recorder.mimeType || this.mimeType }))
-      }
-      recorder.stop()
-    })
-  }
-
-  cancel() {
-    this.recorder?.stream.getTracks().forEach((track) => track.stop())
-    this.stream?.getTracks().forEach((track) => track.stop())
-    this.recorder = null
-    this.stream = null
-    this.chunks = []
-  }
-}
 
 class WorkletCapture implements MicCapture {
   private stream: MediaStream | null = null
@@ -173,9 +116,7 @@ class WorkletCapture implements MicCapture {
   }
 }
 
-/** Picks the capture strategy for this browser. Safari gets direct mp4/AAC; everyone else gets AudioWorklet + WAV. */
+/** Always AudioWorklet → WAV (see file header). */
 export function createMicCapture(): MicCapture {
-  const directMimeType = supportsDirectMimeType()
-  if (directMimeType) return new MediaRecorderCapture(directMimeType)
   return new WorkletCapture()
 }
