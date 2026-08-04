@@ -35,7 +35,7 @@ export function NewHome() {
             lg:grid-cols-[280px_minmax(0,720px)] lg:grid-rows-1 lg:gap-8 lg:px-6
           `}
         >
-          <HomeProjects projects={projects} scroll={scroll} />
+          <HomeProjects projects={projects} sessions={sessions} scroll={scroll} />
           <HomeSessions sessions={sessions} search={search} scroll={scroll} />
           <HomeUtilityNav
             class="flex lg:hidden"

@@ -1,8 +1,14 @@
+import { sessionsForProject } from "./home-project-sessions"
 import type { HomeProjectsController } from "./home-projects-controller"
 import { HomeProjectsView } from "./home-projects-view"
 import type { HomeScrollController } from "./home-scroll-controller"
+import type { HomeSessionsController } from "./home-sessions-controller"
 
-export function HomeProjects(props: { projects: HomeProjectsController; scroll: HomeScrollController }) {
+export function HomeProjects(props: {
+  projects: HomeProjectsController
+  sessions: HomeSessionsController
+  scroll: HomeScrollController
+}) {
   return (
     <HomeProjectsView
       language={props.projects.copy.language}
@@ -11,6 +17,9 @@ export function HomeProjects(props: { projects: HomeProjectsController; scroll: 
       recentlyClosed={props.projects.project.recentlyClosed}
       selection={props.projects.selection.value}
       homedir={props.projects.project.homedir}
+      chatsPath={props.projects.project.chatsPath}
+      isChats={props.projects.project.isChats}
+      projectSessions={(project) => sessionsForProject(props.sessions.data.projectRecords(), project)}
       serverHealth={props.projects.server.health}
       projectsForServer={props.projects.server.projects}
       collapsed={props.projects.server.collapsed}
@@ -20,8 +29,11 @@ export function HomeProjects(props: { projects: HomeProjectsController; scroll: 
       unseenCount={props.projects.project.unseenCount}
       onWheel={props.scroll.viewport.containWheel}
       onChooseProject={props.projects.project.choose}
+      onNewProject={props.projects.project.newProject}
+      onNewChat={props.projects.project.newChat}
       onFocusServer={props.projects.server.focus}
       onToggleCollapsed={props.projects.server.toggleCollapsed}
+      onToggleExpandProject={props.projects.project.toggleExpand}
       onEditServer={props.projects.server.edit}
       onSetDefaultServer={props.projects.server.setDefault}
       onRemoveServer={props.projects.server.remove}
@@ -29,6 +41,7 @@ export function HomeProjects(props: { projects: HomeProjectsController; scroll: 
       onSelectProject={props.projects.project.select}
       onAddProjects={props.projects.project.add}
       onOpenProjectNewSession={props.projects.project.openNewSession}
+      onOpenSession={props.sessions.session.open}
       onEditProject={props.projects.project.edit}
       onRevealProject={props.projects.project.reveal}
       onClearNotifications={props.projects.project.clearNotifications}
