@@ -1,8 +1,6 @@
 // Encodes raw PCM float samples (as produced by an AudioWorklet tap on the
-// mic) into a 16-bit mono WAV file. The STT server cannot decode WebM/Opus
-// (what Chrome's MediaRecorder produces), so Chrome capture goes through this
-// path instead of MediaRecorder. Safari's MediaRecorder produces mp4/AAC,
-// which the server does accept directly (see mic-capture.ts).
+// mic) into a 16-bit mono WAV file. macos-speech-server cannot decode
+// WebM/Opus or the MediaRecorder mp4/m4a Chrome now produces — WAV only.
 function floatTo16BitPCM(samples: Float32Array): Int16Array {
   const out = new Int16Array(samples.length)
   for (let i = 0; i < samples.length; i++) {
