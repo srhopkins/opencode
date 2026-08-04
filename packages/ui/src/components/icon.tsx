@@ -104,6 +104,9 @@ const icons = {
   providers: `<path d="M10.0001 4.37562V2.875M13 4.37793V2.87793M7.00014 4.37793V2.875M10 17.1279V15.6279M13 17.1279V15.6279M7 17.1279V15.6279M15.625 13.0029H17.125M15.625 7.00293H17.125M15.625 10.0029H17.125M2.875 10.0029H4.375M2.875 13.0029H4.375M2.875 7.00293H4.375M4.375 4.37793H15.625V15.6279H4.375V4.37793ZM12.6241 10.0022C12.6241 11.4519 11.4488 12.6272 9.99908 12.6272C8.54934 12.6272 7.37408 11.4519 7.37408 10.0022C7.37408 8.55245 8.54934 7.3772 9.99908 7.3772C11.4488 7.3772 12.6241 8.55245 12.6241 10.0022Z" stroke="currentColor" stroke-linecap="square"/>`,
   models: `<path fill-rule="evenodd" clip-rule="evenodd" d="M17.5 10C12.2917 10 10 12.2917 10 17.5C10 12.2917 7.70833 10 2.5 10C7.70833 10 10 7.70833 10 2.5C10 7.70833 12.2917 10 17.5 10Z" stroke="currentColor"/>`,
   "arrow-undo-down": `<path d="M4.08333 11.0859L1.75 8.7526L4.08333 6.41927M2.33333 8.7526L12.5417 8.7526L12.5417 3.21094L7 3.21094" stroke="currentColor" stroke-width="1" stroke-linecap="square"/>`,
+  mic: `<path d="M12.5 5C12.5 3.61929 11.3807 2.5 10 2.5C8.61929 2.5 7.5 3.61929 7.5 5V10C7.5 11.3807 8.61929 12.5 10 12.5C11.3807 12.5 12.5 11.3807 12.5 10V5Z" stroke="currentColor" stroke-linecap="square"/><path d="M5 9.58333V10C5 12.7614 7.23858 15 10 15C12.7614 15 15 12.7614 15 10V9.58333M10 15V17.5M7.5 17.5H12.5" stroke="currentColor" stroke-linecap="square"/>`,
+  speaker: `<path d="M2.5 7.5H5.41667L9.16667 4.16667V15.8333L5.41667 12.5H2.5V7.5Z" stroke="currentColor" stroke-linejoin="round"/><path d="M12.5 7.5C13.6046 8.5 13.6046 11.5 12.5 12.5M15 5C17.5 7.5 17.5 12.5 15 15" stroke="currentColor" stroke-linecap="round"/>`,
+  "speaker-off": `<path d="M2.5 7.5H5.41667L9.16667 4.16667V15.8333L5.41667 12.5H2.5V7.5Z" stroke="currentColor" stroke-linejoin="round"/><path d="M12.5 7.5L17.5 12.5M17.5 7.5L12.5 12.5" stroke="currentColor" stroke-linecap="round"/>`,
 }
 
 const spriteID = "opencode-icon-sprite"
