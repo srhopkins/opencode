@@ -16,6 +16,10 @@ export const SidebarContent = (props: {
   mobile?: boolean
   opened: Accessor<boolean>
   aimMove: (event: MouseEvent) => void
+  // Pinned Chats tile, rendered above the divider and outside the drag range.
+  pinnedProject: Accessor<LocalProject | undefined>
+  renderPinnedProject: (project: LocalProject) => JSX.Element
+  // Everything else — the drag-reorderable "Projects" section.
   projects: Accessor<LocalProject[]>
   renderProject: (project: LocalProject) => JSX.Element
   handleDragStart: (event: unknown) => void
@@ -63,9 +67,21 @@ export const SidebarContent = (props: {
             <DragDropSensors />
             <ConstrainDragXAxis />
             <div class="h-full w-full flex flex-col items-center gap-3 px-3 py-3 overflow-y-auto no-scrollbar">
-              <SortableProvider ids={props.projects().map((p) => p.worktree)}>
-                <For each={props.projects()}>{(project) => props.renderProject(project)}</For>
-              </SortableProvider>
+              <Show when={props.pinnedProject()}>
+                {(pinned) => (
+                  <div role="group" aria-label="Chats" class="flex flex-col items-center gap-3 w-full">
+                    {props.renderPinnedProject(pinned())}
+                  </div>
+                )}
+              </Show>
+              <Show when={props.pinnedProject()}>
+                <div class="w-6 shrink-0 border-t border-border-weaker-base" />
+              </Show>
+              <div role="group" aria-label="Projects" class="flex flex-col items-center gap-3 w-full">
+                <SortableProvider ids={props.projects().map((p) => p.worktree)}>
+                  <For each={props.projects()}>{(project) => props.renderProject(project)}</For>
+                </SortableProvider>
+              </div>
               <Tooltip
                 placement={placement()}
                 value={

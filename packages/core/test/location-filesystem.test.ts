@@ -56,6 +56,47 @@ describe("FileSystem", () => {
     ),
   )
 
+  it.live("classifies a symlinked directory as a directory", () =>
+    withTmp((directory) =>
+      Effect.gen(function* () {
+        const real = path.join(directory, "real-project")
+        yield* Effect.promise(() => fs.mkdir(real))
+        yield* Effect.promise(() => fs.writeFile(path.join(real, "file.txt"), "hi"))
+        yield* Effect.promise(() => fs.symlink(real, path.join(directory, "linked-project")))
+        const entries = yield* (yield* FileSystem.Service).list()
+        expect(entries.map((entry) => ({ path: entry.path, type: entry.type }))).toEqual([
+          { path: RelativePath.make("linked-project" + path.sep), type: "directory" },
+          { path: RelativePath.make("real-project" + path.sep), type: "directory" },
+        ])
+      }).pipe(provide(directory)),
+    ),
+  )
+
+  it.live("classifies a symlinked file as a file", () =>
+    withTmp((directory) =>
+      Effect.gen(function* () {
+        const real = path.join(directory, "real.txt")
+        yield* Effect.promise(() => fs.writeFile(real, "hi"))
+        yield* Effect.promise(() => fs.symlink(real, path.join(directory, "linked.txt")))
+        const entries = yield* (yield* FileSystem.Service).list()
+        expect(entries.map((entry) => ({ path: entry.path, type: entry.type }))).toEqual([
+          { path: RelativePath.make("linked.txt"), type: "file" },
+          { path: RelativePath.make("real.txt"), type: "file" },
+        ])
+      }).pipe(provide(directory)),
+    ),
+  )
+
+  it.live("drops broken symlinks from listings", () =>
+    withTmp((directory) =>
+      Effect.gen(function* () {
+        yield* Effect.promise(() => fs.symlink(path.join(directory, "does-not-exist"), path.join(directory, "broken")))
+        const entries = yield* (yield* FileSystem.Service).list()
+        expect(entries).toEqual([])
+      }).pipe(provide(directory)),
+    ),
+  )
+
   it.live("rejects lexical escapes", () =>
     withTmp((directory) =>
       Effect.gen(function* () {

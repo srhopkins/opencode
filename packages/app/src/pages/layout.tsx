@@ -1757,7 +1757,9 @@ export default function LegacyLayout(props: ParentProps) {
   function handleDragOver(event: DragEvent) {
     const { draggable, droppable } = event
     if (draggable && droppable) {
-      const projects = layout.projects.list()
+      // Indices here must line up with the "Projects" section (pinned Chats excluded) since
+      // that's the list SortableProvider was given — layout.projects.move() expects the same.
+      const projects = layout.projects.grouped()
       const fromIndex = projects.findIndex((p) => p.worktree === draggable.id.toString())
       const toIndex = projects.findIndex((p) => p.worktree === droppable.id.toString())
       if (fromIndex !== toIndex && toIndex !== -1) {
@@ -2227,13 +2229,18 @@ export default function LegacyLayout(props: ParentProps) {
     )
   }
 
-  const projects = () => layout.projects.list()
+  const projects = () => layout.projects.grouped()
+  const pinnedProject = () => layout.projects.pinned()
   const projectOverlay = () => <ProjectDragOverlay projects={projects} activeProject={() => store.activeProject} />
   const sidebarContent = (mobile?: boolean) => (
     <SidebarContent
       mobile={mobile}
       opened={() => layout.sidebar.opened()}
       aimMove={aim.move}
+      pinnedProject={pinnedProject}
+      renderPinnedProject={(project) => (
+        <SortableProject ctx={projectSidebarCtx} project={project} sortNow={sortNow} mobile={mobile} pinned />
+      )}
       projects={projects}
       renderProject={(project) => (
         <SortableProject ctx={projectSidebarCtx} project={project} sortNow={sortNow} mobile={mobile} />

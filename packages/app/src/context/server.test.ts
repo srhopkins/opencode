@@ -197,6 +197,59 @@ describe("createServerProjects", () => {
       dispose()
     })
   })
+
+  test("ensure appends without prepending or clearing dismissals (auto-seed semantics)", () => {
+    createRoot((dispose) => {
+      const [scope] = createSignal(ServerScope.local)
+      const [store, setStore] = createStore({ projects: {}, lastProject: {}, recentlyClosed: {} })
+      const projects = createServerProjects({ scope, store, setStore })
+
+      projects.open("/manual")
+      projects.ensure("/seeded-a")
+      projects.ensure("/seeded-b")
+      // Appends after existing tiles instead of prepending like open().
+      expect(projects.list()).toEqual([
+        { worktree: "/manual", expanded: true },
+        { worktree: "/seeded-a", expanded: true },
+        { worktree: "/seeded-b", expanded: true },
+      ])
+
+      // Idempotent: re-running the seed pass doesn't duplicate an already-present tile.
+      projects.ensure("/seeded-a")
+      expect(projects.list()).toHaveLength(3)
+
+      // A tile the user explicitly closed stays closed across a later seed pass.
+      projects.close("/seeded-b")
+      projects.ensure("/seeded-b")
+      expect(projects.list().map((p) => p.worktree)).toEqual(["/manual", "/seeded-a"])
+      expect(projects.recentlyClosed()).toEqual(["/seeded-b"])
+      dispose()
+    })
+  })
+
+  test("move reorders within a subset while leaving excluded (pinned) entries in place", () => {
+    createRoot((dispose) => {
+      const [scope] = createSignal(ServerScope.local)
+      const [store, setStore] = createStore({ projects: {}, lastProject: {}, recentlyClosed: {} })
+      const projects = createServerProjects({ scope, store, setStore })
+
+      // Chats seeded in the middle of the raw persisted array, as ensure() would leave it.
+      projects.open("/a")
+      projects.ensure("/chats")
+      projects.open("/b")
+      expect(projects.list().map((p) => p.worktree)).toEqual(["/b", "/a", "/chats"])
+
+      const excludeChats = (worktree: string) => worktree === "/chats"
+      // toIndex is relative to the non-excluded subset: ["/b", "/a"] -> move "/a" to index 0.
+      projects.move("/a", 0, excludeChats)
+      expect(projects.list().map((p) => p.worktree)).toEqual(["/a", "/b", "/chats"])
+
+      // Moving the pinned entry itself is a no-op since it's filtered out of the subset.
+      projects.move("/chats", 0, excludeChats)
+      expect(projects.list().map((p) => p.worktree)).toEqual(["/a", "/b", "/chats"])
+      dispose()
+    })
+  })
 })
 
 describe("migrateCanonicalLocalServerState", () => {

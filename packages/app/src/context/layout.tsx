@@ -13,6 +13,8 @@ import { Persist, persisted, removePersisted } from "@/utils/persist"
 import { pathKey } from "@/utils/path-key"
 import { decode64 } from "@/utils/base64"
 import { same } from "@/utils/same"
+import { getFilename } from "@opencode-ai/core/util/path"
+import { murfyChatsPath, seedMurfyRail } from "@/utils/murfy-rail-seed"
 import { createScrollPersistence, type SessionScroll } from "./layout-scroll"
 import { createPathHelpers } from "./file/path"
 import type { ProjectAvatarVariant } from "@opencode-ai/ui/v2/project-avatar-v2"
@@ -513,15 +515,35 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
       })
     })
 
+    // Append-only add for background/auto-discovery seeding (see murfy-rail-seed.ts): resolves
+    // sandbox roots like open() does, but never prepends and never clears a user's dismissal.
+    function ensureProject(directory: string) {
+      const root = rootFor(directory)
+      if (server.projects.list().find((x) => x.worktree === root)) return
+      void serverSync().project.loadSessions(root)
+      server.projects.ensure(root)
+    }
+
+    // Chats is pinned first in the rail (see `list` below) and excluded from drag reordering
+    // (see `projects.move`). Its path is derived, not stored, so it works out of the box for
+    // every ~/murfy tree without any extra persisted state.
+    const chatsPath = createMemo(() => murfyChatsPath(serverSync().data.path.home, import.meta.env.VITE_MURFY_ROOT))
+    const pinnedKey = createMemo(() => pathKey(chatsPath()))
+
     const enriched = createMemo(() => server.projects.list().map(enrich))
     const list = createMemo(() => {
-      const projects = enriched()
-      return projects.map((project) => {
+      const projects = enriched().map((project) => {
         const color = project.icon?.color ?? colors[project.worktree]
         if (!color) return project
         const icon = project.icon ? { ...project.icon, color } : { color }
         return { ...project, icon }
       })
+
+      const key = pinnedKey()
+      const pinnedIndex = projects.findIndex((project) => pathKey(project.worktree) === key)
+      if (pinnedIndex <= 0) return projects
+      const pinned = projects[pinnedIndex]
+      return [pinned, ...projects.slice(0, pinnedIndex), ...projects.slice(pinnedIndex + 1)]
     })
 
     createEffect(() => {
@@ -606,6 +628,35 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
       })
     })
 
+    // One-shot rail auto-seed per server scope: discover ~/murfy/chats + ~/murfy/projects/* and
+    // append any missing tiles. Runs once ready() and serverSync().ready() are both true and a
+    // home directory is known; a second browser tab (or a server switch) re-runs it for its own
+    // scope, but each run is idempotent thanks to ensureProject's append-only semantics.
+    const seededScopes = new Set<string>()
+    createEffect(() => {
+      if (!ready()) return
+      if (!serverSync().ready) return
+      const home = serverSync().data.path.home
+      if (!home) return
+      const scope = serverSdk().scope
+      if (seededScopes.has(scope)) return
+      seededScopes.add(scope)
+      void seedMurfyRail({
+        home,
+        root: import.meta.env.VITE_MURFY_ROOT,
+        list: (directory) =>
+          serverSdk()
+            .api.file.list({ location: { directory } })
+            .then((result) =>
+              result.data.map((entry) => ({
+                name: getFilename(entry.path.replace(/[\\/]+$/, "")),
+                type: entry.type,
+              })),
+            ),
+        ensure: ensureProject,
+      }).catch(() => {})
+    })
+
     onCleanup(() => {
       if (sessionFrame !== undefined) cancelAnimationFrame(sessionFrame)
       if (sessionTimer !== undefined) window.clearTimeout(sessionTimer)
@@ -632,6 +683,17 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
       },
       projects: {
         list,
+        // Pinned Chats tile, or undefined if it hasn't been seeded/opened yet.
+        pinned: createMemo(() => {
+          const key = pinnedKey()
+          return list().find((project) => pathKey(project.worktree) === key)
+        }),
+        // Everything but the pinned Chats tile, in display order — this is the drag-reorderable
+        // "Projects" section.
+        grouped: createMemo(() => {
+          const key = pinnedKey()
+          return list().filter((project) => pathKey(project.worktree) !== key)
+        }),
         recentlyClosed: createMemo(() => {
           const known = new Set(serverSync().data.project.map((project) => pathKey(project.worktree)))
           return server.projects
@@ -646,6 +708,7 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
           void serverSync().project.loadSessions(root)
           server.projects.open(root)
         },
+        ensure: ensureProject,
         close(directory: string) {
           server.projects.close(directory)
         },
@@ -655,8 +718,11 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         collapse(directory: string) {
           server.projects.collapse(directory)
         },
+        // toIndex is relative to `grouped()` — the pinned Chats tile is never part of the drag
+        // range and keeps its own position in the persisted array.
         move(directory: string, toIndex: number) {
-          server.projects.move(directory, toIndex)
+          const key = pinnedKey()
+          server.projects.move(directory, toIndex, (worktree) => pathKey(worktree) === key)
         },
       },
       sidebar: {

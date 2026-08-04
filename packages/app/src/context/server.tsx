@@ -109,6 +109,16 @@ export function createServerProjects<T extends ServerProjectState>(input: {
       if (current().some((project) => project.worktree === directory)) return
       setStore("projects", scope, [{ worktree: directory, expanded: true }, ...current()])
     },
+    // Append-only variant for background/auto-discovery seeding: unlike open(), this never
+    // prepends and never clears a dismissal. A project the user explicitly closed stays closed
+    // even if seeding rediscovers its directory on a later launch.
+    ensure(directory: string) {
+      const scope = input.scope()
+      const key = pathKey(directory)
+      if (current().some((project) => pathKey(project.worktree) === key)) return
+      if (currentClosed().some((worktree) => pathKey(worktree) === key)) return
+      setStore("projects", scope, [...current(), { worktree: directory, expanded: true }])
+    },
     // User-initiated close: removes the project and records it in recently closed.
     // Internal, non-user removals (e.g. sandbox/worktree normalization) should use remove().
     close(directory: string) {
@@ -128,12 +138,28 @@ export function createServerProjects<T extends ServerProjectState>(input: {
       const index = current().findIndex((project) => project.worktree === directory)
       if (index !== -1) setStore("projects", input.scope(), index, "expanded", false)
     },
-    move(directory: string, toIndex: number) {
-      const fromIndex = current().findIndex((project) => project.worktree === directory)
+    // `exclude` lets callers reorder within a subset (e.g. everything but pinned tiles) while
+    // leaving excluded entries at their existing position in the persisted array. `toIndex` is
+    // interpreted as an index into the non-excluded subset, matching what's rendered on screen.
+    move(directory: string, toIndex: number, exclude?: (worktree: string) => boolean) {
+      const all = current()
+      if (!exclude) {
+        const fromIndex = all.findIndex((project) => project.worktree === directory)
+        if (fromIndex === -1 || fromIndex === toIndex) return
+        const next = [...all]
+        const [item] = next.splice(fromIndex, 1)
+        next.splice(toIndex, 0, item)
+        setStore("projects", input.scope(), next)
+        return
+      }
+      const others = all.filter((project) => !exclude(project.worktree))
+      const fromIndex = others.findIndex((project) => project.worktree === directory)
       if (fromIndex === -1 || fromIndex === toIndex) return
-      const next = [...current()]
-      const [item] = next.splice(fromIndex, 1)
-      next.splice(toIndex, 0, item)
+      const reordered = [...others]
+      const [item] = reordered.splice(fromIndex, 1)
+      reordered.splice(toIndex, 0, item)
+      let cursor = 0
+      const next = all.map((project) => (exclude(project.worktree) ? project : reordered[cursor++]))
       setStore("projects", input.scope(), next)
     },
     last() {

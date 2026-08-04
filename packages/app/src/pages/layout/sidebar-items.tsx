@@ -42,6 +42,13 @@ export const ProjectIcon = (props: {
   )
   const notify = createMemo(() => props.notify && (hasPermissions() || unseenCount() > 0))
   const name = createMemo(() => props.project.name || getFilename(props.project.worktree))
+  // Real git repos vs. plain/virtual directories (project.vcs is set for the former, undefined
+  // for the latter — see murfy's ~/murfy/projects tree, which mixes symlinked repos with plain
+  // folders). Skip the badge for the synthetic "global"/no-directory project.
+  const vcsBadge = createMemo(() => {
+    if (!props.project.worktree) return
+    return props.project.vcs === "git" ? ("git" as const) : ("virtual" as const)
+  })
 
   return (
     <div class={`relative size-8 shrink-0 rounded ${props.class ?? ""}`}>
@@ -68,6 +75,17 @@ export const ProjectIcon = (props: {
         <div class="absolute bottom-px right-px size-3 rounded-full bg-background-base z-10 flex items-center justify-center">
           <Spinner class="size-[9px]" />
         </div>
+      </Show>
+      <Show when={!props.working && vcsBadge()} keyed>
+        {(kind) => (
+          <div
+            classList={{
+              "absolute bottom-px left-px size-1.5 rounded-full z-10": true,
+              "bg-icon-base": kind === "git",
+              "bg-transparent border border-icon-weak-base": kind === "virtual",
+            }}
+          />
+        )}
       </Show>
     </div>
   )
