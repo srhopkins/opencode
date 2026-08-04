@@ -1,17 +1,21 @@
 import { useDirectoryPicker } from "@/components/directory-picker"
 import { useServerManagementController } from "@/components/dialog-select-server"
+import { DialogNewProjectV2 } from "@/components/dialog-new-project-v2"
 import { useSettingsCommand } from "@/components/settings-dialog"
 import { DialogServerV2 } from "@/components/settings-v2/dialog-server-v2"
+import { useGlobal } from "@/context/global"
 import { type LocalProject } from "@/context/layout"
 import { useLanguage } from "@/context/language"
 import { useNotification } from "@/context/notification"
 import { usePlatform } from "@/context/platform"
 import { ServerConnection } from "@/context/server"
 import { closeHomeProject, errorMessage, homeProjectDirectories } from "@/pages/layout/helpers"
+import { murfyChatsPath } from "@/utils/murfy-rail-seed"
+import { pathKey } from "@/utils/path-key"
 import { Persist, persisted } from "@/utils/persist"
 import { showToast } from "@/utils/toast"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
-import { createResource } from "solid-js"
+import { createMemo, createResource } from "solid-js"
 import { createStore } from "solid-js/store"
 import type { HomeController } from "./home-controller"
 
@@ -22,7 +26,13 @@ export function createHomeProjectsController(home: HomeController) {
   const language = useLanguage()
   const notification = useNotification()
   const openSettings = useSettingsCommand()
+  const global = useGlobal()
   const serverManagement = useServerManagementController({ navigateOnAdd: false })
+  // Sidebar v2 (murfy-0sn): ~/murfy/chats is a project like any other in the persisted store
+  // (seeded append-only by murfy-rail-seed.ts), but the sidebar renders it as the flat "Chats"
+  // section instead of an expandable folder row — this is how the view tells the two apart.
+  const chatsPath = createMemo(() => murfyChatsPath(home.project.homedir(), import.meta.env.VITE_MURFY_ROOT))
+  const isChats = (project: LocalProject) => pathKey(project.worktree) === pathKey(chatsPath())
   const [_state, setState, _, ready] = persisted(
     Persist.global("home.servers", ["home.servers.v1"]),
     createStore({ collapsed: {} as Record<string, boolean> }),
@@ -68,9 +78,22 @@ export function createHomeProjectsController(home: HomeController) {
       list: home.project.list,
       recentlyClosed: home.project.recentlyClosed,
       homedir: home.project.homedir,
+      chatsPath,
+      isChats,
       select: home.project.select,
       add: home.project.add,
       openNewSession: home.project.openProjectNewSession,
+      toggleExpand: (conn: ServerConnection.Any, project: LocalProject) => {
+        const ctx = global.ensureServerCtx(conn)
+        if (project.expanded) ctx.projects.collapse(project.worktree)
+        else ctx.projects.expand(project.worktree)
+      },
+      newChat: (conn: ServerConnection.Any) => home.project.openProjectNewSession(conn, chatsPath()),
+      newProject: (conn: ServerConnection.Any) => {
+        void dialog.show(() => (
+          <DialogNewProjectV2 server={conn} onCreated={(worktree) => home.project.select(conn, worktree)} />
+        ))
+      },
       edit: (conn: ServerConnection.Any, project: LocalProject) => {
         void import("@/components/dialog-edit-project-v2").then(({ DialogEditProjectV2 }) => {
           void dialog.show(() => <DialogEditProjectV2 server={conn} project={project} />)
@@ -105,7 +128,10 @@ export function createHomeProjectsController(home: HomeController) {
         if (next) home.selection.set(next)
       },
       move: (conn: ServerConnection.Any, worktree: string, index: number) => {
-        home.server.context(conn).projects.move(worktree, index)
+        // The rendered "Projects" list excludes the pinned Chats tile, so `index` is an index
+        // into that subset — exclude Chats here too, matching the legacy rail (context/layout.tsx).
+        const key = pathKey(chatsPath())
+        home.server.context(conn).projects.move(worktree, index, (item) => pathKey(item) === key)
       },
       canReveal: canRevealProject,
       reveal: (conn: ServerConnection.Any, project: LocalProject) => {

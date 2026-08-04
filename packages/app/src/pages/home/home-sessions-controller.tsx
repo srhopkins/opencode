@@ -97,6 +97,19 @@ export function createHomeSessionsController(home: HomeController) {
     }),
   )
   const records = createMemo(() => allRecords().slice(0, HOME_SESSION_LIMIT))
+  // Sidebar v2 (murfy-0sn): the "Projects" tree needs every project's sessions nested under it
+  // regardless of which project (if any) is selected for the right-hand pane, so this always
+  // spans every directory instead of narrowing to `home.project.selected()`. It's a client-side
+  // filter over the already-loaded `indexedSessions` — no extra fetch.
+  const allProjectDirectories = createMemo(() => home.project.list().flatMap(directories))
+  const projectRecords = createMemo(() =>
+    buildHomeSessionRecords({
+      sessions: indexedSessions,
+      projectDirectories: allProjectDirectories,
+      projects: home.project.list,
+      projectByID,
+    }),
+  )
   const groups = createMemo(() => groupSessions(records(), language))
   const prefetched = new Set<string>()
 
@@ -174,6 +187,8 @@ export function createHomeSessionsController(home: HomeController) {
       groups,
       loading: () => sessionLoad.isLoading,
       searchRecords: allRecords,
+      // Sidebar v2 (murfy-0sn): unscoped-by-selection records for the nested "Projects" tree.
+      projectRecords,
     },
     session: {
       showProjectName: () => !home.project.selected(),

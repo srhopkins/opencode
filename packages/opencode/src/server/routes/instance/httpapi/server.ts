@@ -1,3 +1,5 @@
+import os from "node:os"
+import path from "node:path"
 import { Config as EffectConfig, Context, Effect, Layer } from "effect"
 import { HttpApiBuilder, OpenApi } from "effect/unstable/httpapi"
 import { HttpClient, HttpMiddleware, HttpRouter, HttpServer, HttpServerResponse } from "effect/unstable/http"
@@ -191,6 +193,37 @@ const docRoute = HttpRouter.use((router) => router.add("GET", "/doc", () => Effe
   Layer.provide(authOnlyRouterLayer),
 )
 
+// murfy: fork addition (murfy-0sn). No upstream route creates directories — the typed file
+// HttpApi group is read-only (list/content/status). This is a minimal escape-hatch route (raw
+// HttpRouter, same auth as /doc) so the "New Project" sidebar button can mkdir -p a fresh
+// ~/murfy/projects/<name> before ensure()-ing it into the tile list. Scoped to the user's home
+// directory as a defense-in-depth bound; not part of the declared HttpApi/OpenAPI contract, so
+// no SDK regeneration is needed. See murfy-0sn notes for the upstream-alignment tradeoff.
+const murfyMkdirRoute = HttpRouter.use((router) =>
+  Effect.gen(function* () {
+    const fs = yield* FSUtil.Service
+    yield* router.add("POST", "/murfy/mkdir", (request) =>
+      Effect.gen(function* () {
+        const body = yield* request.json.pipe(Effect.catch(() => Effect.succeed(undefined)))
+        const target =
+          body && typeof body === "object" && !Array.isArray(body) && typeof (body as { path?: unknown }).path === "string"
+            ? (body as { path: string }).path
+            : undefined
+        const home = os.homedir()
+        if (!target || !path.isAbsolute(target) || !FSUtil.contains(home, target) || target === home) {
+          return yield* HttpServerResponse.json({ ok: false, error: "path must be a directory under the home directory" }, { status: 400 })
+        }
+        const created = yield* fs.ensureDir(target).pipe(
+          Effect.map(() => true),
+          Effect.catch(() => Effect.succeed(false)),
+        )
+        if (!created) return yield* HttpServerResponse.json({ ok: false, error: "failed to create directory" }, { status: 500 })
+        return yield* HttpServerResponse.json({ ok: true, path: target })
+      }),
+    )
+  }),
+).pipe(Layer.provide(authOnlyRouterLayer))
+
 const uiRoute = HttpRouter.use((router) =>
   Effect.gen(function* () {
     const fs = yield* FSUtil.Service
@@ -280,6 +313,7 @@ export function createRoutes(
     instanceRoutes,
     serverRoutes,
     docRoute,
+    murfyMkdirRoute,
     uiRoute,
   ).pipe(
     Layer.provide([

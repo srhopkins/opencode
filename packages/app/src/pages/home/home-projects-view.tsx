@@ -1,4 +1,5 @@
-import { type Accessor, createMemo, For, type JSX, onCleanup, Show, splitProps } from "solid-js"
+import type { Session } from "@opencode-ai/sdk/v2/client"
+import { type Accessor, createMemo, createSignal, For, type JSX, onCleanup, Show, splitProps } from "solid-js"
 import { createStore } from "solid-js/store"
 import { DragDropProvider, PointerSensor } from "@dnd-kit/solid"
 import { isSortable, useSortable } from "@dnd-kit/solid/sortable"
@@ -20,8 +21,25 @@ import { ServerRowMenuView, serverMenuLabels } from "@/components/server/server-
 import { ServerHealthIndicator } from "@/components/server/server-row"
 import { type ServerHealth } from "@/utils/server-health"
 import { fileManagerApp } from "@/utils/file-manager"
+import { sessionTitle } from "@/utils/session-title"
+import { shouldOpenSessionInBackground } from "../home-session-open"
+import { HOME_PROJECT_NESTED_SESSION_CAP } from "./home-project-sessions"
+import type { HomeSessionRecord, OpenSessionOptions } from "./home-sessions-controller"
 
 const HOME_PROJECT_NAV_LABEL = "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
+
+// Middle-click or Cmd+click on macOS (Ctrl+click elsewhere) opens a session tab in the
+// background without navigating, matching browser conventions (mirrors home-sessions-view.tsx).
+function isBackgroundOpen(event: MouseEvent) {
+  return shouldOpenSessionInBackground({
+    button: event.button,
+    mac: typeof navigator === "object" && /(Mac|iPod|iPhone|iPad)/.test(navigator.platform),
+    meta: event.metaKey,
+    ctrl: event.ctrlKey,
+    shift: event.shiftKey,
+    alt: event.altKey,
+  })
+}
 
 const serverContextMenuID = (server: ServerConnection.Any) => `server:${ServerConnection.key(server)}`
 const projectContextMenuID = (server: ServerConnection.Any, directory: string) =>
@@ -34,6 +52,11 @@ export type HomeProjectsViewProps = {
   recentlyClosed: Accessor<LocalProject[]>
   selection: Accessor<HomeProjectSelection>
   homedir: Accessor<string>
+  // Sidebar v2 (murfy-0sn): ~/murfy/chats is stored as a project like any other, but renders as
+  // the flat "Chats" section below instead of an expandable folder row.
+  chatsPath: Accessor<string>
+  isChats: (project: LocalProject) => boolean
+  projectSessions: (project: LocalProject) => HomeSessionRecord[]
   serverHealth: (server: ServerConnection.Any) => ServerHealth | undefined
   projectsForServer: (server: ServerConnection.Any) => LocalProject[]
   collapsed: (server: ServerConnection.Any) => boolean
@@ -43,8 +66,11 @@ export type HomeProjectsViewProps = {
   unseenCount: (server: ServerConnection.Any, project: LocalProject) => number
   onWheel: (event: WheelEvent) => void
   onChooseProject: (server: ServerConnection.Any) => void
+  onNewProject: (server: ServerConnection.Any) => void
+  onNewChat: (server: ServerConnection.Any) => void
   onFocusServer: (server: ServerConnection.Any) => void
   onToggleCollapsed: (server: ServerConnection.Any) => void
+  onToggleExpandProject: (server: ServerConnection.Any, project: LocalProject) => void
   onEditServer: (server: ServerConnection.Http) => void
   onSetDefaultServer: (server: ServerConnection.Any | undefined) => void
   onRemoveServer: (server: ServerConnection.Any) => void
@@ -52,6 +78,7 @@ export type HomeProjectsViewProps = {
   onSelectProject: (server: ServerConnection.Any, directory: string) => void
   onAddProjects: (server: ServerConnection.Any, directories: string[]) => void
   onOpenProjectNewSession: (server: ServerConnection.Any, directory: string) => void
+  onOpenSession: (session: Session, options?: OpenSessionOptions) => void
   onEditProject: (server: ServerConnection.Any, project: LocalProject) => void
   onRevealProject: (server: ServerConnection.Any, project: LocalProject) => void
   onClearNotifications: (server: ServerConnection.Any, project: LocalProject) => void
@@ -60,12 +87,21 @@ export type HomeProjectsViewProps = {
   onOpenHelp: () => void
 }
 
+function nonChatsProjects(props: HomeProjectsViewProps, items: LocalProject[]) {
+  return items.filter((project) => !props.isChats(project))
+}
+
+function chatsProjectOf(props: HomeProjectsViewProps, items: LocalProject[]) {
+  return items.find((project) => props.isChats(project))
+}
+
 export function HomeProjectsView(props: HomeProjectsViewProps) {
   const [contextMenu, setContextMenu] = createStore({ open: undefined as string | undefined })
   const contextMenuProps = {
     contextMenuOpen: (id: string) => contextMenu.open === id,
     onSetContextMenuOpen: (id: string, open: boolean) => setContextMenu("open", open ? id : undefined),
   }
+  const regularProjects = createMemo(() => nonChatsProjects(props, props.projects()))
   return (
     <aside
       class={`
@@ -81,45 +117,61 @@ export function HomeProjectsView(props: HomeProjectsViewProps) {
       <div class="flex h-7 min-w-0 shrink-0 items-center justify-between pl-1.5 pr-3">
         <div class="text-v2-text-text-muted [font-weight:530]">{props.language.t("home.projects")}</div>
         <Show
-          when={props.servers().length === 1 && !(props.projects().length === 0 && props.recentlyClosed().length > 0)}
+          when={props.servers().length === 1 && !(regularProjects().length === 0 && props.recentlyClosed().length > 0)}
         >
-          <TooltipV2 placement="bottom" value={props.language.t("home.project.add")}>
-            <IconButtonV2
-              data-action="home-add-project"
-              variant="ghost-muted"
-              size="large"
-              class="titlebar-icon [&_[data-slot=icon-svg]]:text-v2-icon-icon-muted"
-              icon={<IconV2 name="folder-add-left" />}
-              disabled={props.serverHealth(props.servers()[0])?.healthy === false}
-              onClick={() => props.onChooseProject(props.servers()[0])}
-              aria-label={props.language.t("home.project.add")}
-            />
-          </TooltipV2>
+          <div class="flex items-center gap-1">
+            <TooltipV2 placement="bottom" value={props.language.t("home.project.new")}>
+              <IconButtonV2
+                data-action="home-new-project"
+                variant="ghost-muted"
+                size="large"
+                class="titlebar-icon [&_[data-slot=icon-svg]]:text-v2-icon-icon-muted"
+                icon={<IconV2 name="plus" />}
+                disabled={props.serverHealth(props.servers()[0])?.healthy === false}
+                onClick={() => props.onNewProject(props.servers()[0])}
+                aria-label={props.language.t("home.project.new")}
+              />
+            </TooltipV2>
+            <TooltipV2 placement="bottom" value={props.language.t("home.project.add")}>
+              <IconButtonV2
+                data-action="home-add-project"
+                variant="ghost-muted"
+                size="large"
+                class="titlebar-icon [&_[data-slot=icon-svg]]:text-v2-icon-icon-muted"
+                icon={<IconV2 name="folder-add-left" />}
+                disabled={props.serverHealth(props.servers()[0])?.healthy === false}
+                onClick={() => props.onChooseProject(props.servers()[0])}
+                aria-label={props.language.t("home.project.add")}
+              />
+            </TooltipV2>
+          </div>
         </Show>
       </div>
       <ScrollView data-slot="home-projects-scroll" class="min-h-0 min-w-0 shrink">
         <Show
           when={props.servers().length > 1}
           fallback={
-            <div class="pr-3">
+            <div class="flex min-w-0 flex-col gap-4 pr-3">
               <Show
-                when={props.projects().length > 0}
+                when={regularProjects().length > 0}
                 fallback={<HomeProjectEmpty {...props} server={props.servers()[0]} items={props.recentlyClosed()} />}
               >
                 <HomeProjectList
                   {...props}
                   {...contextMenuProps}
                   server={props.servers()[0]}
-                  items={props.projects()}
+                  items={regularProjects()}
                 />
               </Show>
+              <HomeChatsSection {...props} server={props.servers()[0]} project={chatsProjectOf(props, props.projects())} />
             </div>
           }
         >
           <div class="flex min-w-0 flex-col gap-4 pr-3">
             <For each={props.servers()}>
               {(item) => {
-                const projects = () => props.projectsForServer(item)
+                const allProjects = () => props.projectsForServer(item)
+                const projects = () => nonChatsProjects(props, allProjects())
                 const healthy = () => !!props.serverHealth(item)?.healthy
                 const hasProjects = () => projects().length > 0
                 const collapsed = () => props.collapsed(item)
@@ -136,6 +188,9 @@ export function HomeProjectsView(props: HomeProjectsViewProps) {
                     <Show when={healthy() && hasProjects() && !collapsed()}>
                       <div class="mx-3 h-px bg-v2-border-border-base" />
                       <HomeProjectList {...props} {...contextMenuProps} server={item} items={projects()} />
+                    </Show>
+                    <Show when={healthy() && !collapsed()}>
+                      <HomeChatsSection {...props} server={item} project={chatsProjectOf(props, allProjects())} />
                     </Show>
                   </div>
                 )
@@ -368,18 +423,27 @@ function HomeProjectSlot(
   )
 
   return (
-    <HomeProjectRow
-      {...props}
-      project={project()}
-      server={props.server}
-      index={props.index}
-      serverSelected={props.selection().server === ServerConnection.key(props.server)}
-      selected={
-        props.selection().server === ServerConnection.key(props.server) &&
-        props.selection().directory === props.worktree
-      }
-      unseen={props.unseenCount(props.server, project())}
-    />
+    <>
+      <HomeProjectRow
+        {...props}
+        project={project()}
+        server={props.server}
+        index={props.index}
+        serverSelected={props.selection().server === ServerConnection.key(props.server)}
+        selected={
+          props.selection().server === ServerConnection.key(props.server) &&
+          props.selection().directory === props.worktree
+        }
+        unseen={props.unseenCount(props.server, project())}
+      />
+      <Show when={project().expanded}>
+        <HomeProjectSessionList
+          language={props.language}
+          sessions={props.projectSessions(project())}
+          onOpenSession={props.onOpenSession}
+        />
+      </Show>
+    </>
   )
 }
 
@@ -485,6 +549,11 @@ function HomeProjectRow(
         }}
         data-selected={props.selected ? "" : undefined}
         aria-current={props.selected ? "page" : undefined}
+        // Without an explicit label the accessible name would absorb the nested expand
+        // chevron's aria-label too ("Collapse project " + name), which both misleads
+        // screen readers about what activating the row does and makes the two controls
+        // indistinguishable by accessible name.
+        aria-label={displayName(props.project)}
         disabled={serverUnreachable()}
         onPointerDown={(event) => {
           // Same-server mouse selection happens on pointerdown (like tabs),
@@ -514,6 +583,33 @@ function HomeProjectRow(
           pointerDownSelected = undefined
         }}
       >
+        <span
+          data-action="home-project-expand"
+          class={`
+            -ml-0.5 -mr-1.5 inline-flex size-5 shrink-0 items-center justify-center
+            rounded-[4px] text-v2-icon-icon-muted hover:bg-v2-overlay-simple-overlay-hover
+          `}
+          aria-label={
+            props.project.expanded ? props.language.t("home.project.collapse") : props.language.t("home.project.expand")
+          }
+          aria-expanded={!!props.project.expanded}
+          onClick={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            props.onToggleExpandProject(props.server, props.project)
+          }}
+          onPointerDown={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+          }}
+        >
+          <IconV2
+            name="chevron-down"
+            size="small"
+            class="transition-transform duration-150 ease-in-out"
+            style={{ transform: `rotate(${props.project.expanded ? 0 : -90}deg)` }}
+          />
+        </span>
         <HomeProjectAvatar project={props.project} />
         <span class={HOME_PROJECT_NAV_LABEL}>{displayName(props.project)}</span>
       </HomeProjectNavButton>
@@ -577,6 +673,123 @@ function HomeProjectRow(
           onClick={() => props.onOpenProjectNewSession(props.server, props.project.worktree)}
         />
       </div>
+    </div>
+  )
+}
+
+// Sidebar v2 (murfy-0sn): nested sessions rendered inline beneath an expanded project folder
+// row, most-recent-first (already sorted by `sessionsForProject`), capped with a "show more"
+// affordance rather than rendering every session for busy projects.
+function HomeProjectSessionList(props: {
+  language: HomeProjectsViewProps["language"]
+  sessions: HomeSessionRecord[]
+  onOpenSession: HomeProjectsViewProps["onOpenSession"]
+}) {
+  const [showAll, setShowAll] = createSignal(false)
+  const hasMore = createMemo(() => props.sessions.length > HOME_PROJECT_NESTED_SESSION_CAP)
+  const visible = createMemo(() =>
+    showAll() ? props.sessions : props.sessions.slice(0, HOME_PROJECT_NESTED_SESSION_CAP),
+  )
+  return (
+    <div class="flex min-w-0 flex-col gap-px pb-1">
+      <For each={visible()}>
+        {(record) => <HomeProjectSessionRow record={record} onOpenSession={props.onOpenSession} nested />}
+      </For>
+      <Show when={props.sessions.length === 0}>
+        <div class="flex h-7 min-w-0 items-center pl-8 pr-3 text-v2-text-text-faint [font-weight:440]">
+          {props.language.t("home.sessions.empty")}
+        </div>
+      </Show>
+      <Show when={hasMore()}>
+        <button
+          type="button"
+          data-action="home-project-sessions-show-more"
+          class={`
+            flex h-7 w-full min-w-0 shrink-0 cursor-default items-center rounded-[6px] border-0
+            bg-transparent pl-8 pr-3 text-left text-v2-text-text-faint [font-weight:440]
+            transition-colors duration-[120ms] ease-in-out hover:text-v2-text-text-base
+          `}
+          onClick={() => setShowAll((value) => !value)}
+        >
+          {showAll()
+            ? props.language.t("home.project.sessions.showLess")
+            : props.language.t("home.project.sessions.showMore")}
+        </button>
+      </Show>
+    </div>
+  )
+}
+
+function HomeProjectSessionRow(props: {
+  record: HomeSessionRecord
+  onOpenSession: HomeProjectsViewProps["onOpenSession"]
+  nested?: boolean
+}) {
+  const title = createMemo(() => sessionTitle(props.record.session.title) || props.record.session.id)
+  return (
+    <button
+      type="button"
+      data-component="home-project-session-row"
+      class={`
+        flex h-7 w-full min-w-0 shrink-0 cursor-default items-center gap-2 rounded-[6px] border-0
+        bg-transparent pr-3 text-left text-v2-text-text-muted [font-weight:440]
+        transition-[background-color,color] duration-[120ms] ease-in-out
+        hover:bg-v2-background-bg-layer-01 hover:text-v2-text-text-base
+        focus-visible:bg-v2-background-bg-layer-01 focus-visible:text-v2-text-text-base focus-visible:outline-none
+      `}
+      classList={{ "pl-8": !!props.nested, "pl-1.5": !props.nested }}
+      onMouseDown={(event) => {
+        if (event.button === 1) event.preventDefault()
+      }}
+      onClick={(event) => props.onOpenSession(props.record.session, { background: isBackgroundOpen(event) })}
+      onAuxClick={(event) => {
+        if (!isBackgroundOpen(event)) return
+        event.preventDefault()
+        props.onOpenSession(props.record.session, { background: true })
+      }}
+    >
+      <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{title()}</span>
+    </button>
+  )
+}
+
+// Sidebar v2 (murfy-0sn): flat "Chats" section — ~/murfy/chats sessions with no folder chrome,
+// most-recent-first. `project` is undefined until the rail auto-seed (or a manual visit) has
+// discovered ~/murfy/chats for this server, in which case the section renders its empty state.
+function HomeChatsSection(
+  props: HomeProjectsViewProps & { server: ServerConnection.Any; project: LocalProject | undefined },
+) {
+  const unreachable = () => props.serverHealth(props.server)?.healthy === false
+  const sessions = createMemo(() => (props.project ? props.projectSessions(props.project) : []))
+  return (
+    <div class="flex min-w-0 flex-col gap-1">
+      <div class="mt-3 flex h-7 min-w-0 shrink-0 items-center justify-between pl-1.5 pr-3">
+        <div class="text-v2-text-text-muted [font-weight:530]">{props.language.t("home.chats")}</div>
+        <TooltipV2 placement="bottom" value={props.language.t("home.chats.new")}>
+          <IconButtonV2
+            data-action="home-new-chat"
+            variant="ghost-muted"
+            size="small"
+            class="[&_[data-slot=icon-svg]]:text-v2-icon-icon-muted"
+            icon={<IconV2 name="edit" />}
+            disabled={unreachable()}
+            onClick={() => props.onNewChat(props.server)}
+            aria-label={props.language.t("home.chats.new")}
+          />
+        </TooltipV2>
+      </div>
+      <Show
+        when={sessions().length > 0}
+        fallback={
+          <div class="flex h-7 min-w-0 items-center pl-1.5 pr-3 text-v2-text-text-faint [font-weight:440]">
+            {props.language.t("home.chats.empty")}
+          </div>
+        }
+      >
+        <For each={sessions()}>
+          {(record) => <HomeProjectSessionRow record={record} onOpenSession={props.onOpenSession} />}
+        </For>
+      </Show>
     </div>
   )
 }
