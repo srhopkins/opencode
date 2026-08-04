@@ -26,6 +26,7 @@ import { useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
 import { createSessionTabs } from "@/pages/session/helpers"
 import { showToast } from "@/utils/toast"
+import { VoiceControlsV2 } from "@/lib/murfy-voice/voice-controls-v2"
 import { PromptInputV2, type PromptInputV2Suggestion } from "@opencode-ai/session-ui/v2/prompt-input"
 import {
   createPromptInputV2Controller,
@@ -42,6 +43,9 @@ export type PromptInputV2ComposerProps = {
 export type PromptInputV2ControllerProps = Omit<PromptInputProps, "class" | "submission">
 export type PromptInputV2ComposerController = PromptInputV2Interaction & {
   readonly model: PromptInputProps["controls"]["model"]
+  readonly sessionID: string | undefined
+  readonly sync: ReturnType<typeof useSync>
+  readonly insertText: (text: string) => void
 }
 
 export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
@@ -73,6 +77,11 @@ export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
             }
           />
         }
+      />
+      <VoiceControlsV2
+        sessionID={() => props.controller.sessionID}
+        sync={props.controller.sync}
+        onTranscribed={props.controller.insertText}
       />
     </div>
   )
@@ -406,6 +415,28 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
     },
   })
   Object.defineProperty(controller, "model", { get: () => props.controls.model })
+  Object.defineProperty(controller, "sessionID", { get: () => props.controls.session.id })
+  Object.defineProperty(controller, "sync", { value: sync })
+  Object.defineProperty(controller, "insertText", {
+    value: (text: string) => {
+      const trimmed = text.trim()
+      if (!trimmed) return
+      const current = prompt.current()
+      const last = current[current.length - 1]
+      const next =
+        last?.type === "text"
+          ? [
+              ...current.slice(0, -1),
+              {
+                ...last,
+                content: last.content + (last.content && !/\s$/.test(last.content) ? " " : "") + trimmed,
+                end: last.start + last.content.length + (last.content && !/\s$/.test(last.content) ? 1 : 0) + trimmed.length,
+              },
+            ]
+          : [...current, { type: "text" as const, content: trimmed, start: 0, end: trimmed.length }]
+      prompt.set(next, promptLength(next))
+    },
+  })
 
   command.register("prompt-input", () => [
     {
