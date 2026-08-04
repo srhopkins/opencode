@@ -601,6 +601,8 @@ export const dict = {
   "home.recentlyClosed": "Nedavno zatvoreni projekti",
   "home.server.collapse": "Sažmi projekte servera",
   "home.server.expand": "Proširi projekte servera",
+  "home.nav.collapse": "Sažmi bočnu traku",
+  "home.nav.expand": "Proširi bočnu traku",
   "home.sessions.search.placeholder": "Pretraži sesije",
   "home.sessions.search.placeholder.scoped": "Pretraži sesije u {{scope}}",
   "home.sessions.search.sessions": "Sesije",

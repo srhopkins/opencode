@@ -558,6 +558,8 @@ export const dict = {
   "home.recentlyClosed": "Kürzlich geschlossen",
   "home.server.collapse": "Serverprojekte einklappen",
   "home.server.expand": "Serverprojekte ausklappen",
+  "home.nav.collapse": "Seitenleiste einklappen",
+  "home.nav.expand": "Seitenleiste ausklappen",
   "home.sessions.search.placeholder": "Sitzungen durchsuchen",
   "home.sessions.search.placeholder.scoped": "Sitzungen in {{scope}} durchsuchen",
   "home.sessions.search.sessions": "Sitzungen",

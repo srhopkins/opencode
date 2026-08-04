@@ -593,6 +593,8 @@ export const dict = {
   "home.recentlyClosed": "最近關閉",
   "home.server.collapse": "收合伺服器專案",
   "home.server.expand": "展開伺服器專案",
+  "home.nav.collapse": "收合側邊欄",
+  "home.nav.expand": "展開側邊欄",
   "home.sessions.search.placeholder": "搜尋工作階段",
   "home.sessions.search.placeholder.scoped": "在 {{scope}} 中搜尋工作階段",
   "home.sessions.search.sessions": "工作階段",

@@ -546,6 +546,8 @@ export const dict = {
   "home.recentlyClosed": "المغلقة مؤخرًا",
   "home.server.collapse": "طي مشاريع الخادم",
   "home.server.expand": "توسيع مشاريع الخادم",
+  "home.nav.collapse": "طي الشريط الجانبي",
+  "home.nav.expand": "توسيع الشريط الجانبي",
   "home.sessions.search.placeholder": "البحث في الجلسات",
   "home.sessions.search.placeholder.scoped": "البحث في جلسات {{scope}}",
   "home.sessions.search.sessions": "الجلسات",

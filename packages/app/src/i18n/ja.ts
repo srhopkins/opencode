@@ -548,6 +548,8 @@ export const dict = {
   "home.recentlyClosed": "最近閉じたプロジェクト",
   "home.server.collapse": "サーバーのプロジェクトを折りたたむ",
   "home.server.expand": "サーバーのプロジェクトを展開",
+  "home.nav.collapse": "サイドバーを折りたたむ",
+  "home.nav.expand": "サイドバーを展開",
   "home.sessions.search.placeholder": "セッションを検索",
   "home.sessions.search.placeholder.scoped": "{{scope}}のセッションを検索",
   "home.sessions.search.sessions": "セッション",

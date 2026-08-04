@@ -597,6 +597,8 @@ export const dict = {
   "home.recentlyClosed": "ที่ปิดไปล่าสุด",
   "home.server.collapse": "ย่อโปรเจกต์ของเซิร์ฟเวอร์",
   "home.server.expand": "ขยายโปรเจกต์ของเซิร์ฟเวอร์",
+  "home.nav.collapse": "ย่อแถบด้านข้าง",
+  "home.nav.expand": "ขยายแถบด้านข้าง",
   "home.sessions.search.placeholder": "ค้นหาเซสชัน",
   "home.sessions.search.placeholder.scoped": "ค้นหาเซสชันใน {{scope}}",
   "home.sessions.search.sessions": "เซสชัน",

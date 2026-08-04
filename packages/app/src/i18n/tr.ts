@@ -606,6 +606,8 @@ export const dict = {
   "home.recentlyClosed": "Yakın zamanda kapatılanlar",
   "home.server.collapse": "Sunucu projelerini daralt",
   "home.server.expand": "Sunucu projelerini genişlet",
+  "home.nav.collapse": "Kenar çubuğunu daralt",
+  "home.nav.expand": "Kenar çubuğunu genişlet",
   "home.sessions.search.placeholder": "Oturum ara",
   "home.sessions.search.placeholder.scoped": "{{scope}} kapsamında oturum ara",
   "home.sessions.search.sessions": "Oturumlar",

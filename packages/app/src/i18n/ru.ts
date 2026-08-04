@@ -602,6 +602,8 @@ export const dict = {
   "home.recentlyClosed": "Недавно закрытые",
   "home.server.collapse": "Свернуть проекты сервера",
   "home.server.expand": "Развернуть проекты сервера",
+  "home.nav.collapse": "Свернуть боковую панель",
+  "home.nav.expand": "Развернуть боковую панель",
   "home.sessions.search.placeholder": "Поиск сессий",
   "home.sessions.search.placeholder.scoped": "Поиск сессий в {{scope}}",
   "home.sessions.search.sessions": "Сессии",

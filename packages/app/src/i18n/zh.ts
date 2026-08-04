@@ -598,6 +598,8 @@ export const dict = {
   "home.recentlyClosed": "最近关闭",
   "home.server.collapse": "折叠服务器项目",
   "home.server.expand": "展开服务器项目",
+  "home.nav.collapse": "折叠侧边栏",
+  "home.nav.expand": "展开侧边栏",
   "home.sessions.search.placeholder": "搜索会话",
   "home.sessions.search.placeholder.scoped": "在 {{scope}} 中搜索会话",
   "home.sessions.search.sessions": "会话",

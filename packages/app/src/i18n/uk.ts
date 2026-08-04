@@ -624,6 +624,8 @@ export const dict = {
   "home.recentlyClosed": "Нещодавно закриті",
   "home.server.collapse": "Згорнути проєкти сервера",
   "home.server.expand": "Розгорнути проєкти сервера",
+  "home.nav.collapse": "Згорнути бічну панель",
+  "home.nav.expand": "Розгорнути бічну панель",
   "home.sessions.search.placeholder": "Пошук сесій",
   "home.sessions.search.placeholder.scoped": "Пошук сесій у {{scope}}",
   "home.sessions.search.sessions": "Сесії",

@@ -948,6 +948,8 @@ export const dict = {
   "home.recentlyClosed": "최근에 닫은 항목",
   "home.server.collapse": "서버 프로젝트 접기",
   "home.server.expand": "서버 프로젝트 펼치기",
+  "home.nav.collapse": "사이드바 접기",
+  "home.nav.expand": "사이드바 펼치기",
   "home.sessions.search.placeholder": "세션 검색",
   "home.sessions.search.placeholder.scoped": "{{scope}}에서 세션 검색",
   "home.sessions.search.sessions": "세션",

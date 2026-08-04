@@ -635,6 +635,8 @@ export const dict = {
   "home.recentlyClosed": "Recently closed",
   "home.server.collapse": "Collapse server projects",
   "home.server.expand": "Expand server projects",
+  "home.nav.collapse": "Collapse sidebar",
+  "home.nav.expand": "Expand sidebar",
   "home.sessions.search.placeholder": "Search sessions",
   "home.sessions.search.placeholder.scoped": "Search sessions in {{scope}}",
   "home.sessions.search.sessions": "Sessions",
