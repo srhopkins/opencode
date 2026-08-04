@@ -88,24 +88,30 @@ const baseLayer = Layer.effect(
         const target = yield* resolve(input.path)
         const info = yield* fs.stat(target.real).pipe(Effect.orDie)
         if (info.type !== "Directory") return yield* Effect.die(new Error("Path is not a directory"))
-        return yield* fs.readDirectoryEntries(target.real).pipe(
-          Effect.orDie,
-          Effect.map((items) =>
-            items
-              .flatMap((item) => {
-                if (item.type !== "file" && item.type !== "directory") return []
-                const absolute = path.join(target.absolute, item.name)
-                const relative = path.relative(target.directory, absolute)
-                return [
-                  Entry.make({
-                    path: RelativePath.make(relative + (item.type === "directory" ? path.sep : "")),
-                    type: item.type,
-                  }),
-                ]
+        const items = yield* fs.readDirectoryEntries(target.real).pipe(Effect.orDie)
+        const resolved = yield* Effect.forEach(items, (item) =>
+          Effect.gen(function* () {
+            const absolute = path.join(target.absolute, item.name)
+            const relative = path.relative(target.directory, absolute)
+            const makeEntry = (type: "file" | "directory") =>
+              Entry.make({
+                path: RelativePath.make(relative + (type === "directory" ? path.sep : "")),
+                type,
               })
-              .sort((a, b) => (a.type === b.type ? a.path.localeCompare(b.path) : a.type === "directory" ? -1 : 1)),
-          ),
+            if (item.type === "file" || item.type === "directory") return [makeEntry(item.type)]
+            if (item.type !== "symlink") return []
+            // readdir's Dirent doesn't follow symlinks, so a symlinked directory (e.g. a
+            // linked project) would otherwise be silently dropped from listings. Stat the
+            // link target to classify it the way callers actually expect.
+            const linkTarget = yield* fs.stat(absolute).pipe(Effect.catch(() => Effect.void))
+            if (linkTarget?.type === "Directory") return [makeEntry("directory")]
+            if (linkTarget?.type === "File") return [makeEntry("file")]
+            return []
+          }),
         )
+        return resolved
+          .flat()
+          .sort((a, b) => (a.type === b.type ? a.path.localeCompare(b.path) : a.type === "directory" ? -1 : 1))
       }),
     })
   }),
