@@ -8,6 +8,7 @@ import { createMicCapture, type MicCapture } from "./mic-capture"
 import { transcribeAudio } from "./stt-client"
 import { createAutoReadSetting } from "./settings"
 import { createAutoReadReplies } from "./auto-read"
+import { usePtt } from "./use-ptt"
 
 export type MicPhase = "idle" | "recording" | "transcribing"
 
@@ -15,6 +16,8 @@ export function useVoiceControls(props: {
   sessionID: Accessor<string | undefined>
   sync: Accessor<DirectorySync>
   onTranscribed: (text: string) => void
+  /** Auto-send the PTT transcript as a message (reuses the composer's submit path). */
+  onAutoSend: (text: string) => void
 }) {
   const [phase, setPhase] = createSignal<MicPhase>("idle")
   const [error, setError] = createSignal<string | null>(null)
@@ -52,7 +55,13 @@ export function useVoiceControls(props: {
   }
 
   const [autoRead, setAutoRead] = createAutoReadSetting()
-  createAutoReadReplies({ sessionID: props.sessionID, sync: props.sync, enabled: autoRead })
+  const autoReadReplies = createAutoReadReplies({ sessionID: props.sessionID, sync: props.sync, enabled: autoRead })
+
+  const ptt = usePtt({
+    onSend: props.onAutoSend,
+    onBargeIn: () => autoReadReplies.stop(),
+    armForceRead: () => autoReadReplies.armForceRead(),
+  })
 
   return {
     phase,
@@ -60,5 +69,6 @@ export function useVoiceControls(props: {
     toggleMic: () => void toggleMic(),
     autoRead,
     toggleAutoRead: () => setAutoRead((value) => !value),
+    ptt,
   }
 }

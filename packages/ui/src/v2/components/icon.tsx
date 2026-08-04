@@ -161,6 +161,10 @@ const icons = {
     viewBox: "0 0 16 16",
     body: `<path d="M2 6H4.33333L7.33333 3.33333V12.6667L4.33333 10H2V6Z" stroke="currentColor" stroke-linejoin="round"/><path d="M10 6L14 10M14 6L10 10" stroke="currentColor" stroke-linecap="round"/>`,
   },
+  headset: {
+    viewBox: "0 0 16 16",
+    body: `<path d="M3.33333 8.66667V7.33333C3.33333 4.75601 5.42267 2.66667 8 2.66667C10.5773 2.66667 12.6667 4.75601 12.6667 7.33333V8.66667" stroke="currentColor" stroke-linecap="round"/><rect x="2" y="8" width="2.66667" height="4.66667" rx="1" stroke="currentColor"/><rect x="11.3333" y="8" width="2.66667" height="4.66667" rx="1" stroke="currentColor"/><path d="M12.6667 12.6667V13C12.6667 13.7364 12.0697 14.3333 11.3333 14.3333H10" stroke="currentColor" stroke-linecap="round"/>`,
+  },
 }
 
 const spriteID = "opencode-v2-icon-sprite"

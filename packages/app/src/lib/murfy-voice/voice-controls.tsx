@@ -6,6 +6,7 @@ import { Show, type Accessor } from "solid-js"
 import { Button } from "@opencode-ai/ui/button"
 import { Icon } from "@opencode-ai/ui/icon"
 import { Tooltip } from "@opencode-ai/ui/tooltip"
+import { Popover } from "@opencode-ai/ui/popover"
 import type { DirectorySync } from "@/context/sync"
 import { useVoiceControls } from "./use-voice-controls"
 
@@ -13,6 +14,7 @@ export function VoiceControls(props: {
   sessionID: Accessor<string | undefined>
   sync: Accessor<DirectorySync>
   onTranscribed: (text: string) => void
+  onAutoSend: (text: string) => void
 }) {
   const voice = useVoiceControls(props)
 
@@ -44,6 +46,60 @@ export function VoiceControls(props: {
           />
         </Button>
       </Tooltip>
+      <Tooltip
+        placement="top"
+        value={
+          voice.ptt.phase() === "recording"
+            ? "Push-to-talk: press again to send"
+            : voice.ptt.phase() === "transcribing"
+              ? "Sending…"
+              : `Push-to-talk (${voice.ptt.describeKeyBinding()})`
+        }
+      >
+        <Button
+          type="button"
+          variant="ghost"
+          class="size-8 p-0"
+          classList={{
+            "animate-pulse": voice.ptt.phase() === "recording",
+            "opacity-50": voice.ptt.phase() === "transcribing",
+          }}
+          disabled={voice.ptt.phase() === "transcribing"}
+          onClick={voice.ptt.togglePtt}
+          aria-pressed={voice.ptt.phase() === "recording"}
+          aria-label="Push-to-talk"
+        >
+          <Icon
+            name="headset"
+            class="size-4.5"
+            style={voice.ptt.phase() === "recording" ? { color: "var(--icon-critical-base)" } : undefined}
+          />
+        </Button>
+      </Tooltip>
+      <Popover
+        open={voice.ptt.capturing()}
+        onOpenChange={(open) => voice.ptt.setCapturing(open)}
+        trigger={<Icon name="keyboard" class="size-4" />}
+        triggerAs="button"
+        triggerProps={{
+          type: "button",
+          "aria-label": "Set push-to-talk key",
+          class: "size-8 p-0 flex items-center justify-center rounded text-icon-weak-base hover:text-icon-base",
+        }}
+      >
+        <div class="p-3 text-12-regular leading-snug max-w-[220px]">
+          <Show
+            when={voice.ptt.capturing()}
+            fallback={
+              <>
+                Push-to-talk key: <strong>{voice.ptt.describeKeyBinding()}</strong>
+              </>
+            }
+          >
+            Press any key to bind push-to-talk…
+          </Show>
+        </div>
+      </Popover>
       <Tooltip placement="top" value={voice.autoRead() ? "Auto-read replies: on" : "Auto-read replies: off"}>
         <Button
           type="button"
@@ -60,9 +116,9 @@ export function VoiceControls(props: {
           />
         </Button>
       </Tooltip>
-      <Show when={voice.error()}>
-        <span class="text-12-regular text-icon-critical-base max-w-[160px] truncate" title={voice.error() ?? undefined}>
-          {voice.error()}
+      <Show when={voice.error() || voice.ptt.error()}>
+        <span class="text-12-regular text-icon-critical-base max-w-[160px] truncate" title={voice.error() ?? voice.ptt.error() ?? undefined}>
+          {voice.error() ?? voice.ptt.error()}
         </span>
       </Show>
     </div>
