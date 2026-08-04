@@ -555,6 +555,8 @@ export const dict = {
   "home.recentlyClosed": "Récemment fermés",
   "home.server.collapse": "Réduire les projets du serveur",
   "home.server.expand": "Développer les projets du serveur",
+  "home.nav.collapse": "Réduire la barre latérale",
+  "home.nav.expand": "Développer la barre latérale",
   "home.sessions.search.placeholder": "Rechercher des sessions",
   "home.sessions.search.placeholder.scoped": "Rechercher les sessions dans {{scope}}",
   "home.sessions.search.sessions": "Sessions",

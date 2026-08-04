@@ -1041,6 +1041,8 @@ export const dict = {
   "home.recentlyClosed": "Nylig lukket",
   "home.server.collapse": "Fold sammen serverprosjekter",
   "home.server.expand": "Utvid serverprosjekter",
+  "home.nav.collapse": "Fold sammen sidepanel",
+  "home.nav.expand": "Utvid sidepanel",
   "home.sessions.search.placeholder": "Søk etter sesjoner",
   "home.sessions.search.placeholder.scoped": "Søk etter sesjoner i {{scope}}",
   "home.sessions.search.sessions": "Sesjoner",
