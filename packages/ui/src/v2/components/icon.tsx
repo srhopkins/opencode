@@ -165,6 +165,10 @@ const icons = {
     viewBox: "0 0 16 16",
     body: `<path d="M3.33333 8.66667V7.33333C3.33333 4.75601 5.42267 2.66667 8 2.66667C10.5773 2.66667 12.6667 4.75601 12.6667 7.33333V8.66667" stroke="currentColor" stroke-linecap="round"/><rect x="2" y="8" width="2.66667" height="4.66667" rx="1" stroke="currentColor"/><rect x="11.3333" y="8" width="2.66667" height="4.66667" rx="1" stroke="currentColor"/><path d="M12.6667 12.6667V13C12.6667 13.7364 12.0697 14.3333 11.3333 14.3333H10" stroke="currentColor" stroke-linecap="round"/>`,
   },
+  waveform: {
+    viewBox: "0 0 16 16",
+    body: `<path d="M2.5 6.5V9.5M5.5 4V12M8 5.5V10.5M10.5 3V13M13.5 6.5V9.5" stroke="currentColor" stroke-linecap="round"/>`,
+  },
 }
 
 const spriteID = "opencode-v2-icon-sprite"

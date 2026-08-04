@@ -1,14 +1,20 @@
-// Composer toolbar controls for murfy voice phase A (legacy v1 layout): a mic
-// button for dictation-to-draft and a speaker toggle for auto-reading
-// completed replies. See voice-controls-v2.tsx for the v2 layout equivalent
+// Composer toolbar controls for murfy voice (legacy v1 layout): dictation
+// mic, the unified PTT/VAD talk button with a live level ring, the PTT|VAD
+// mode toggle, the TTS speed dropdown, the gear settings popover, and the
+// auto-read toggle. See voice-controls-v2.tsx for the v2 layout equivalent
 // and use-voice-controls.ts for the shared logic.
-import { Show, type Accessor } from "solid-js"
+import { createSignal, Show, type Accessor } from "solid-js"
 import { Button } from "@opencode-ai/ui/button"
 import { Icon } from "@opencode-ai/ui/icon"
 import { Tooltip } from "@opencode-ai/ui/tooltip"
 import { Popover } from "@opencode-ai/ui/popover"
 import type { DirectorySync } from "@/context/sync"
 import { useVoiceControls } from "./use-voice-controls"
+import { LevelMeter } from "./level-meter"
+import { VoiceModeToggle } from "./voice-mode-toggle"
+import { VoiceSpeedSelect } from "./voice-speed-select"
+import { VoiceSettingsPanel } from "./voice-settings-panel"
+import { createTtsSpeedSetting } from "./settings"
 
 export function VoiceControls(props: {
   sessionID: Accessor<string | undefined>
@@ -17,6 +23,8 @@ export function VoiceControls(props: {
   onAutoSend: (text: string) => void
 }) {
   const voice = useVoiceControls(props)
+  const [ttsSpeed, setTtsSpeed] = createTtsSpeedSetting()
+  const [settingsOpen, setSettingsOpen] = createSignal(false)
 
   return (
     <div class="flex items-center gap-1">
@@ -37,7 +45,7 @@ export function VoiceControls(props: {
           aria-label="Dictate"
         >
           {/* Color via inline style directly on the icon svg, not a class: button.css
-              sets [data-variant="ghost"] [data-slot="icon-svg"] { color: ... }, which
+              sets [data-slot="icon-svg"] { color: ... }, which
               beats a plain utility class on the icon but not an inline style. */}
           <Icon
             name="mic"
@@ -46,60 +54,61 @@ export function VoiceControls(props: {
           />
         </Button>
       </Tooltip>
-      <Tooltip
-        placement="top"
-        value={
-          voice.ptt.phase() === "recording"
-            ? "Push-to-talk: press again to send"
-            : voice.ptt.phase() === "transcribing"
-              ? "Sending…"
-              : `Push-to-talk (${voice.ptt.describeKeyBinding()})`
-        }
-      >
-        <Button
-          type="button"
-          variant="ghost"
-          class="size-8 p-0"
-          classList={{
-            "animate-pulse": voice.ptt.phase() === "recording",
-            "opacity-50": voice.ptt.phase() === "transcribing",
-          }}
-          disabled={voice.ptt.phase() === "transcribing"}
-          onClick={voice.ptt.togglePtt}
-          aria-pressed={voice.ptt.phase() === "recording"}
-          aria-label="Push-to-talk"
-        >
-          <Icon
-            name="headset"
-            class="size-4.5"
-            style={voice.ptt.phase() === "recording" ? { color: "var(--icon-critical-base)" } : undefined}
-          />
-        </Button>
+
+      <Tooltip placement="top" value={voice.talk.label()}>
+        <div class="relative">
+          <LevelMeter level={voice.talk.level} active={voice.talk.micOpen} />
+          <Button
+            type="button"
+            variant="ghost"
+            class="relative size-8 p-0"
+            classList={{
+              "animate-pulse": voice.talk.danger() || voice.talk.speaking(),
+              "opacity-50": voice.talk.busy(),
+            }}
+            disabled={voice.mode() === "ptt" && voice.talk.busy()}
+            onClick={voice.talk.press}
+            aria-pressed={voice.talk.micOpen()}
+            aria-label="Talk"
+            data-testid="voice-talk-button"
+          >
+            <Icon
+              name={voice.talk.icon()}
+              class="size-4.5"
+              style={
+                voice.talk.danger()
+                  ? { color: "var(--icon-critical-base)" }
+                  : voice.talk.speaking()
+                    ? { color: "var(--icon-interactive-base)" }
+                    : undefined
+              }
+            />
+          </Button>
+        </div>
       </Tooltip>
+
+      <VoiceModeToggle mode={voice.mode} onChange={voice.setMode} />
+
+      <VoiceSpeedSelect speed={ttsSpeed} onChange={setTtsSpeed} />
+
       <Popover
-        open={voice.ptt.capturing()}
-        onOpenChange={(open) => voice.ptt.setCapturing(open)}
-        trigger={<Icon name="keyboard" class="size-4" />}
+        open={settingsOpen()}
+        onOpenChange={setSettingsOpen}
+        trigger={<Icon name="settings-gear" class="size-4" />}
         triggerAs="button"
         triggerProps={{
           type: "button",
-          "aria-label": "Set push-to-talk key",
+          "aria-label": "Voice settings",
           class: "size-8 p-0 flex items-center justify-center rounded text-icon-weak-base hover:text-icon-base",
         }}
       >
-        <div class="p-3 text-12-regular leading-snug max-w-[220px]">
-          <Show
-            when={voice.ptt.capturing()}
-            fallback={
-              <>
-                Push-to-talk key: <strong>{voice.ptt.describeKeyBinding()}</strong>
-              </>
-            }
-          >
-            Press any key to bind push-to-talk…
-          </Show>
-        </div>
+        <VoiceSettingsPanel
+          pttKeyBinding={voice.ptt.keyBinding}
+          pttCapturing={voice.ptt.capturing}
+          setPttCapturing={voice.ptt.setCapturing}
+        />
       </Popover>
+
       <Tooltip placement="top" value={voice.autoRead() ? "Auto-read replies: on" : "Auto-read replies: off"}>
         <Button
           type="button"
@@ -116,9 +125,12 @@ export function VoiceControls(props: {
           />
         </Button>
       </Tooltip>
-      <Show when={voice.error() || voice.ptt.error()}>
-        <span class="text-12-regular text-icon-critical-base max-w-[160px] truncate" title={voice.error() ?? voice.ptt.error() ?? undefined}>
-          {voice.error() ?? voice.ptt.error()}
+      <Show when={voice.error() || voice.talk.error()}>
+        <span
+          class="text-12-regular text-icon-critical-base max-w-[160px] truncate"
+          title={voice.error() ?? voice.talk.error() ?? undefined}
+        >
+          {voice.error() ?? voice.talk.error()}
         </span>
       </Show>
     </div>

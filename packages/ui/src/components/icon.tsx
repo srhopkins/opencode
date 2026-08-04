@@ -108,6 +108,7 @@ const icons = {
   speaker: `<path d="M2.5 7.5H5.41667L9.16667 4.16667V15.8333L5.41667 12.5H2.5V7.5Z" stroke="currentColor" stroke-linejoin="round"/><path d="M12.5 7.5C13.6046 8.5 13.6046 11.5 12.5 12.5M15 5C17.5 7.5 17.5 12.5 15 15" stroke="currentColor" stroke-linecap="round"/>`,
   "speaker-off": `<path d="M2.5 7.5H5.41667L9.16667 4.16667V15.8333L5.41667 12.5H2.5V7.5Z" stroke="currentColor" stroke-linejoin="round"/><path d="M12.5 7.5L17.5 12.5M17.5 7.5L12.5 12.5" stroke="currentColor" stroke-linecap="round"/>`,
   headset: `<path d="M4.16667 10.8333V9.16667C4.16667 5.94501 6.77834 3.33333 10 3.33333C13.2217 3.33333 15.8333 5.94501 15.8333 9.16667V10.8333" stroke="currentColor" stroke-linecap="round"/><rect x="2.5" y="10" width="3.33333" height="5.83333" rx="1.25" stroke="currentColor"/><rect x="14.1667" y="10" width="3.33333" height="5.83333" rx="1.25" stroke="currentColor"/><path d="M15.8333 15.8333V16.25C15.8333 17.1705 15.0871 17.9167 14.1667 17.9167H12.5" stroke="currentColor" stroke-linecap="round"/>`,
+  waveform: `<path d="M3 8V12M6.5 5V15M10 7V13M13.5 4V16M17 8V12" stroke="currentColor" stroke-linecap="round"/>`,
 }
 
 const spriteID = "opencode-icon-sprite"

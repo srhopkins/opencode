@@ -24,11 +24,23 @@ export function usePtt(props: {
   onBargeIn: () => void
   /** Arms the auto-read gate so the reply to this PTT message is always spoken. */
   armForceRead: () => void
+  /**
+   * When set, hotkey presses route to `onModeHotkey` instead of the PTT
+   * toggle while `mode()` returns "vad" — lets the composer-bar integration
+   * send the SAME physical key to `useVoiceLoop`'s start/stop/bargeIn when
+   * VAD is the active session mode. Leaving both unset preserves plain PTT
+   * hotkey behavior (press-toggle-to-talk).
+   */
+  mode?: () => "ptt" | "vad"
+  onModeHotkey?: () => void
 }) {
   const [phase, setPhase] = createSignal<PttPhase>("idle")
   const [error, setError] = createSignal<string | null>(null)
   const [keyBinding, setKeyBinding] = createPttKeyBindingSetting()
   const [capturing, setCapturing] = createSignal(false)
+  // RMS 0..1 while `phase() === "recording"`; consumed by the composer bar's
+  // LevelMeter ring around the unified talk button in PTT mode.
+  const [level, setLevel] = createSignal(0)
   let capture: MicCapture | null = null
 
   const togglePtt = async () => {
@@ -39,7 +51,7 @@ export function usePtt(props: {
       setError(null)
       try {
         const next = createMicCapture()
-        await next.start()
+        await next.start({ onLevel: setLevel })
         capture = next
         setPhase("recording")
       } catch (e) {
@@ -52,6 +64,7 @@ export function usePtt(props: {
     setPhase("transcribing")
     const active = capture
     capture = null
+    setLevel(0)
     try {
       const audio = active ? await active.stop() : undefined
       const text = audio ? await transcribeAudio(audio) : ""
@@ -89,6 +102,10 @@ export function usePtt(props: {
     if (isEditableTarget(event.target) && !isSafeWhileEditing(binding)) return
 
     event.preventDefault()
+    if (props.mode?.() === "vad" && props.onModeHotkey) {
+      props.onModeHotkey()
+      return
+    }
     void togglePtt()
   }
 
@@ -108,5 +125,6 @@ export function usePtt(props: {
     describeKeyBinding: () => describeKeyBinding(keyBinding()),
     capturing,
     setCapturing,
+    level,
   }
 }

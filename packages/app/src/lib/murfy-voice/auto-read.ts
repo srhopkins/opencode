@@ -8,6 +8,12 @@ import { createEffect, onCleanup, type Accessor } from "solid-js"
 import type { Message, Part } from "@opencode-ai/sdk/v2/client"
 import type { DirectorySync } from "@/context/sync"
 import { SpeechQueue } from "./playback"
+import {
+  createCommaGapMsSetting,
+  createCommaSplitMinWordsSetting,
+  createSentenceGapMsSetting,
+  createTtsSpeedSetting,
+} from "./settings"
 
 function isCompletedAssistant(message: Message): boolean {
   return message.role === "assistant" && typeof message.time.completed === "number"
@@ -27,7 +33,14 @@ export function createAutoReadReplies(options: {
   sync: Accessor<DirectorySync>
   enabled: Accessor<boolean>
 }) {
-  const queue = new SpeechQueue()
+  // These setting factories are singleton-cached (see settings.ts), so the gear
+  // popover's sliders write into the exact same live signals SpeechQueue reads
+  // here — a slider move takes effect starting with the next sentence chunk.
+  const [ttsSpeed] = createTtsSpeedSetting()
+  const [sentenceGapMs] = createSentenceGapMsSetting()
+  const [commaGapMs] = createCommaGapMsSetting()
+  const [commaSplitMinWords] = createCommaSplitMinWordsSetting()
+  const queue = new SpeechQueue({ ttsSpeed, sentenceGapMs, commaGapMs, commaSplitMinWords })
   const spokenBySession = new Map<string, Set<string>>()
   // Set by PTT (armForceRead) right before an auto-sent message goes out: the very
   // next completed assistant message is spoken regardless of `enabled`, since PTT is
