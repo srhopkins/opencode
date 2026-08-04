@@ -273,10 +273,15 @@ export const SortableProject = (props: {
   mobile?: boolean
   ctx: ProjectSidebarContext
   sortNow: Accessor<number>
+  // Pinned tiles (currently just Chats) render outside SortableProvider, so `createSortable`
+  // must not be called for them — it reads sortable context eagerly and throws outside a
+  // provider. `pinned` is static per call site (layout.tsx picks the branch), so skipping the
+  // hook conditionally here is safe.
+  pinned?: boolean
 }): JSX.Element => {
   const serverSync = useServerSync()
   const language = useLanguage()
-  const sortable = createSortable(props.project.worktree)
+  const sortable = props.pinned ? undefined : createSortable(props.project.worktree)
   const selected = createMemo(() => props.ctx.currentProject()?.worktree === props.project.worktree)
   const workspaces = createMemo(() => props.ctx.workspaceIds(props.project).slice(0, 2))
   const workspaceEnabled = createMemo(() => props.ctx.workspacesEnabled(props.project))
@@ -341,37 +346,43 @@ export const SortableProject = (props: {
     />
   )
 
+  const body = () => (
+    <Show when={preview() && !selected()} fallback={tile()}>
+      <HoverCard
+        open={!state.suppressHover && hoverOpen() && !state.menu}
+        openDelay={0}
+        closeDelay={0}
+        placement="right-start"
+        gutter={6}
+        trigger={tile()}
+        onOpenChange={(value) => {
+          if (state.menu) return
+          if (value && state.suppressHover) return
+          props.ctx.onHoverOpenChanged(props.project.worktree, value)
+        }}
+      >
+        <ProjectPreviewPanel
+          project={props.project}
+          mobile={props.mobile}
+          selected={selected}
+          workspaceEnabled={workspaceEnabled}
+          workspaces={workspaces}
+          label={label}
+          projectSessions={projectSessions}
+          workspaceSessions={workspaceSessions}
+          ctx={props.ctx}
+          language={language}
+        />
+      </HoverCard>
+    </Show>
+  )
+
+  if (props.pinned) return <div>{body()}</div>
+
   return (
     // @ts-ignore
-    <div use:sortable classList={{ "opacity-30": sortable.isActiveDraggable }}>
-      <Show when={preview() && !selected()} fallback={tile()}>
-        <HoverCard
-          open={!state.suppressHover && hoverOpen() && !state.menu}
-          openDelay={0}
-          closeDelay={0}
-          placement="right-start"
-          gutter={6}
-          trigger={tile()}
-          onOpenChange={(value) => {
-            if (state.menu) return
-            if (value && state.suppressHover) return
-            props.ctx.onHoverOpenChanged(props.project.worktree, value)
-          }}
-        >
-          <ProjectPreviewPanel
-            project={props.project}
-            mobile={props.mobile}
-            selected={selected}
-            workspaceEnabled={workspaceEnabled}
-            workspaces={workspaces}
-            label={label}
-            projectSessions={projectSessions}
-            workspaceSessions={workspaceSessions}
-            ctx={props.ctx}
-            language={language}
-          />
-        </HoverCard>
-      </Show>
+    <div use:sortable classList={{ "opacity-30": sortable!.isActiveDraggable }}>
+      {body()}
     </div>
   )
 }
