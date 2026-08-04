@@ -1,9 +1,16 @@
 // Prepares assistant reply text for TTS: strip markdown/code (we don't want
 // the voice reading out "asterisk asterisk bold asterisk asterisk"), then
 // split into sentence-sized chunks so playback can start before the whole
-// reply has streamed in and finished.
+// reply has streamed in and finished. Optional comma splitting inserts
+// shorter seams (gapAfterMs) between long clauses.
 
 const CODE_BLOCK_SPOKEN_PLACEHOLDER = " Code block. "
+
+export interface SpeechChunk {
+  text: string
+  /** Silence after this chunk finishes, before the next starts (comma seams). */
+  gapAfterMs?: number
+}
 
 export function stripMarkdownForSpeech(text: string): string {
   let out = text
@@ -48,7 +55,52 @@ export function splitIntoSentences(text: string): string[] {
   return sentences
 }
 
-/** Combines strip + split for convenience. */
-export function textToSpeechChunks(text: string): string[] {
-  return splitIntoSentences(stripMarkdownForSpeech(text))
+function wordCount(text: string): number {
+  const trimmed = text.trim()
+  if (!trimmed) return 0
+  return trimmed.split(/\s+/).length
+}
+
+/** True when the comma at `index` is a thousands-separator between digits (e.g. 1,000). */
+function isNumericComma(text: string, index: number): boolean {
+  const prev = text[index - 1]
+  const next = text[index + 1]
+  return prev !== undefined && next !== undefined && /\d/.test(prev) && /\d/.test(next)
+}
+
+/**
+ * Split one sentence at commas where both resulting sides have ≥ minWords words.
+ * Puts `commaGapMs` on the chunk before each seam; the final fragment has no gapAfterMs.
+ */
+function splitSentenceAtCommas(sentence: string, minWords: number, commaGapMs: number): SpeechChunk[] {
+  for (let i = 0; i < sentence.length; i++) {
+    if (sentence[i] !== "," || isNumericComma(sentence, i)) continue
+    const left = sentence.slice(0, i).trim()
+    const right = sentence.slice(i + 1).trim()
+    if (wordCount(left) < minWords || wordCount(right) < minWords) continue
+    const rest = splitSentenceAtCommas(right, minWords, commaGapMs)
+    return [{ text: left, gapAfterMs: commaGapMs }, ...rest]
+  }
+  return [{ text: sentence }]
+}
+
+/**
+ * Strip markdown, split into speech chunks. With no opts (or commaSplitMinWords
+ * undefined/0): sentence chunks only, no gapAfterMs — legacy behavior.
+ */
+export function textToSpeechChunks(
+  text: string,
+  opts?: { commaSplitMinWords?: number; commaGapMs?: number },
+): SpeechChunk[] {
+  const sentences = splitIntoSentences(stripMarkdownForSpeech(text))
+  const minWords = opts?.commaSplitMinWords ?? 0
+  if (minWords < 1) {
+    return sentences.map((sentence) => ({ text: sentence }))
+  }
+  const commaGapMs = opts?.commaGapMs ?? 250
+  const chunks: SpeechChunk[] = []
+  for (const sentence of sentences) {
+    chunks.push(...splitSentenceAtCommas(sentence, minWords, commaGapMs))
+  }
+  return chunks
 }
